@@ -377,14 +377,10 @@ function selectParty(key) {
 function confirmParty() {
   if (!state.selectedParty) return;
 
-  // 既にパーティ確定&クリア進行中の場合は、パーティ再構築せずマップへ
-  if (state.partyData.length > 0 && state.cleared.length > 0) {
-    if (!state.available || state.available.length === 0) {
-      state.available = ['trivial_plain'];
-    }
-    goTo('map');
-    return;
-  }
+  // ★FIX: 「既にパーティ確定&クリア進行中なら…」の早期return分岐を削除。
+  // この分岐が原因で、2回目以降のNEW GAMEで stateリセットがスキップされ、
+  // clearedSubMissions などが残って「再戦扱い」になっていた。
+  // NEW GAMEは常にフルリセットする方針に統一。
 
   // ★カスタムパーティの場合: 3体選択モーダルを開く
   if (STARTER_PARTIES[state.selectedParty].isCustom) {

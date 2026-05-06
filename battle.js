@@ -2772,11 +2772,6 @@ function onMissionVictory() {
   const isReplay = (state.currentSubMissionId && state.clearedSubMissions.includes(state.currentSubMissionId))
                 || (!state.currentSubMissionId && state.cleared.includes(missionId));
 
-  // ★★★DEBUG: isReplay判定の中身を画面に表示(原因特定用、確認後削除)
-  const dbgMsg = `🔍 DEBUG\nmissionId: ${missionId}\ncurrentSubMissionId: ${state.currentSubMissionId}\nclearedSubMissions: [${(state.clearedSubMissions||[]).join(', ')}]\ncleared: [${(state.cleared||[]).join(', ')}]\nisReplay: ${isReplay}`;
-  alert(dbgMsg);
-  console.log(dbgMsg);
-
   // パーティのHP状態を保存(ペット除外)
   const allyUnits = battle.units.filter(u => u.side === 'ally' && !u.isPet);
   state.partyData.forEach((pd, i) => {
