@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ChronosⅣ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- タイトル画面 -->
+  <div class="screen active" id="screen-title">
+    <div class="title-block">
+      <div class="title-main">CHRONOS Ⅳ</div>
+      <div class="title-sub">TACTICAL WARRIOR準拠版</div>
+    </div>
+    <div class="title-buttons">
+      <button class="btn btn-primary" onclick="goTo('party-select')">NEW GAME</button>
+      <button class="btn" disabled>CONTINUE</button>
+      <button class="btn" disabled>OPTIONS</button>
+    </div>
+    <div class="title-version">v3.9 - All Passives</div>
+  </div>
+
+  <!-- パーティ選択画面 -->
+  <div class="screen" id="screen-party-select">
+    <div class="game-header">
+      <h1>LOBBY</h1>
+      <div class="subtitle">ACT 1: WOODLAND / 初期パーティ選択</div>
+    </div>
+
+    <div class="party-intro">◆ 3つのパーティから1つを選ぶ ◆</div>
+
+    <div class="party-options" id="party-options"></div>
+
+    <div class="party-bottom-bar">
+      <button class="btn" onclick="goTo('title')">◀ タイトル</button>
+      <button class="btn btn-primary" id="confirm-btn" onclick="confirmParty()" disabled>
+        出陣 ▶
+      </button>
+    </div>
+  </div>
+
+  <!-- マップ画面(シンプル: マップとミッション選択のみ) -->
+  <div class="screen" id="screen-map">
+    <div class="map-top-bar">
+      <div class="map-act-name">ACT Ⅰ — WOODLAND</div>
+      <div class="map-keys" id="map-keys">
+        <span class="map-key-item" id="map-key-gold" title="GOLD KEY">
+          <img id="key-icon-gold" alt="GOLD"> <span id="key-gold-count">0</span>
+        </span>
+        <span class="map-key-item" id="map-key-blue" title="BLUE KEY">
+          <img id="key-icon-blue" alt="BLUE"> <span id="key-blue-count">0</span>
+        </span>
+      </div>
+      <button class="btn" onclick="goTo('roster')" style="font-size: 11px; padding: 5px 12px;">📋 編成</button>
+    </div>
+    <div class="map-area" id="map-area">
+      <svg class="map-edges" id="map-edges"></svg>
+      <!-- ノードはJSで動的生成 -->
+    </div>
+    <div class="map-hint" id="map-hint">▶ をタップして出撃</div>
+  </div>
+
+  <!-- 編成画面(WOODLAND情報 + HP概観 + メンバー一覧) -->
+  <div class="screen" id="screen-roster">
+    <div class="act-info">
+      <div class="act-name">ACT Ⅰ — WOODLAND</div>
+      <div class="act-meta">LV CAP 12 / PARTY MAX 6</div>
+    </div>
+
+    <!-- パーティHP概観 -->
+    <div class="party-hp-overview" id="party-hp-overview"></div>
+
+    <!-- メンバー一覧(タップで個別キャラ詳細へ) -->
+    <div class="roster-list-wrap">
+      <div class="roster-list" id="roster-list"></div>
+    </div>
+
+    <div class="map-bottom-bar">
+      <button class="btn" onclick="goTo('map')" style="font-size: 11px; padding: 6px 14px;">◀ マップへ</button>
+      <button class="btn btn-equip" onclick="openCharDetailFromRoster()" style="font-size: 11px; padding: 6px 14px;">📋 キャラ詳細</button>
+    </div>
+  </div>
+
+  <!-- ★段階1: ミッション選択画面(原作風) -->
+  <div class="screen" id="screen-mission-select">
+    <div class="ms-frame">
+      <div class="ms-left">
+        <div class="ms-area-title" id="ms-area-title">エリア名</div>
+        <div class="ms-mission-list" id="ms-mission-list">
+          <!-- ミッション項目はJSで生成 -->
+        </div>
+      </div>
+      <div class="ms-right">
+        <div class="ms-detail-title" id="ms-detail-title">ミッション選択</div>
+        <div class="ms-detail-desc" id="ms-detail-desc">左のリストからミッションを選んでください。</div>
+        <div class="ms-detail-stats" id="ms-detail-stats"></div>
+      </div>
+    </div>
+    <div class="ms-bottom-bar">
+      <button class="btn ms-back-btn" onclick="goTo('map')">◀ Back</button>
+      <button class="btn ms-accept-btn" id="ms-accept-btn" disabled onclick="acceptSelectedMission()">Accept ▶</button>
+    </div>
+  </div>
+
+  <!-- 戦闘画面 (Step 1.1: 表示のみ) -->
+  <div class="screen" id="screen-battle">
+    <div class="battle-top-bar">
+      <div class="battle-mission-name" id="battle-mission">⚔ Battle</div>
+      <div class="battle-turn-info" id="battle-turn">TURN 1</div>
+    </div>
+
+    <div class="battle-stage">
+      <div class="battle-grid-wrap">
+        <div class="battle-grid" id="battle-grid"></div>
+      </div>
+
+      <div class="battle-side-panel">
+        <div class="side-panel-title">TURN ORDER</div>
+        <div class="turn-order" id="turn-order"></div>
+
+        <div class="battle-action-bar" id="action-bar" style="flex-direction: column; gap: 3px;">
+          <button class="btn btn-attack" id="action-attack" onclick="toggleAttackMode()" style="width: 100%; font-size: 10px;">⚔ スキル</button>
+          <button class="btn btn-primary" id="action-wait" onclick="actionWait()" style="width: 100%; font-size: 10px;">待機</button>
+          <button class="btn" onclick="confirmRetreat()" style="width: 100%; font-size: 9px;">撤退</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="battle-log" id="battle-log">
+      <span class="log-turn">[Turn 1]</span> バトル開始!
+    </div>
+  </div>
+
+</div>
+
+<script src="data_sprites.js"></script>
+<script src="data_game.js"></script>
+<script src="ui_screens.js"></script>
+<script src="battle.js"></script>
+
+</body>
+</html>
