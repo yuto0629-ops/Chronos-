@@ -3762,13 +3762,16 @@ function recruitFromTavern(classKey, avgLv) {
   const maxHP = cls.hp_base + (cls.hp_per_level * (avgLv - 1));
 
   const skills = SKILLS[classKey] || [];
-  const skillLevels = {};
-  skills.forEach((s, i) => { skillLevels[i] = 1; });
+  // ★Phase 1: 初期習得スキルだけLv1スタート、未習得はLv0のまま
+  const skillLevels = buildInitialSkillLevels(classKey);
+  // 既存スキル(Lv>0)にLvポイントを振り分ける
+  const learnedIdxList = Object.keys(skillLevels).filter(i => skillLevels[i] > 0).map(Number);
   const autoPoints = Math.max(0, avgLv - 1);
   let remaining = autoPoints;
   let i = 0;
-  while (remaining > 0) {
-    skillLevels[i % skills.length]++;
+  while (remaining > 0 && learnedIdxList.length > 0) {
+    const targetIdx = learnedIdxList[i % learnedIdxList.length];
+    skillLevels[targetIdx]++;
     remaining--;
     i++;
   }

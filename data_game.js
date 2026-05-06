@@ -466,3 +466,45 @@ const MISSIONS = {
 
 const STARTER_PARTIES = {"vanguards": {"name_en": "The Vanguards", "name_ja": "先鋒", "tagline": "力押し・正面突破型", "description": "高HP・高火力の重戦士コンビ。敵陣に飛び込んで殴り合う。", "members": ["champion", "barbarian"], "playstyle": ["近接特化", "高HP"]}, "adepts": {"name_en": "The Adepts", "name_ja": "達人", "tagline": "バランス・万能型", "description": "近接万能のモンクと長射程砲台のアーチャー。状況対応。", "members": ["monk", "archer"], "playstyle": ["近接+遠距離", "万能"]}, "wildkin": {"name_en": "The Wildkin", "name_ja": "野の血", "tagline": "獣使い・数的有利型", "description": "ペット召喚で数的優位。ハウンドは前衛で機動。", "members": ["beastmaster", "hound"], "playstyle": ["召喚", "高機動"]}, "custom": {"name_en": "Custom Party", "name_ja": "テスト編成", "tagline": "好きなクラスを3体選択", "description": "全16クラスから自由に3体を組み合わせてテストできる開発者用編成。", "members": [], "playstyle": ["カスタム", "テスト用"], "isCustom": true}};
 
+
+// ★Phase 1: 各クラスの初期習得スキルインデックス
+// ここに記載されてないクラスは「全スキル習得済み(従来通り)」扱い。
+// 残りのスキル(配列に含まれないindex)は「未習得=Lv0」となり、報酬で習得する。
+// SKILLS配列の順番依存なので、SKILLSデータを変更したら必ず見直すこと。
+const SKILLS_INITIAL_LEARNED = {
+  monk:        [0, 1],  // Bounding Kick, Disrupting Palm (未: Pummel)
+  knight:      [0, 1],  // Critical Slash, Exotic Feint (未: Galant Slash)
+  healer:      [0, 1],  // Quick Shot, Healing Potion (未: Skill Potion)
+  gladiator:   [0, 2],  // Throwing Knives, Buckler Bash (未: Bolas)
+  champion:    [0, 2],  // Slash, Battle Shout (未: Daring Strike)
+  barbarian:   [0, 2],  // Tackle, War Cry (未: Whirlwind)
+  rocketeer:   [0, 1],  // Yellow Tiger, Pink Lion (未: Detonate)
+  jungleman:   [1, 2],  // Boomerang, Poisoned Blade (未: Javelin Sting)
+  archer:      [0, 2],  // Long Sword, Poison Arrow (未: Power Shot)
+  alchemist:   [0, 1],  // Cane, Flame Potion (未: Poison Potion)
+  beastmaster: [0, 2],  // Shillelagh, Lupine Strike (未: Immaterial Bash)
+  ranger:      [0, 1],  // Arrow Spray, Bramble Snare (未: Moss Potion)
+  hound:       [0, 2],  // Maul, Nip (未: Head Butt)
+  coyote:      [0, 1],  // Claw, Howl (未: Nip強化版)
+  badger:      [0, 2],  // Badger Scratch, Roar (未: Badger Maul)
+  serpent:     [0, 1],  // Hiss, Snake Rage (未: Venomous Bite)
+  // bandit_boss はあえて記載しない → 全スキル習得済み(ボス強化のため)
+};
+
+// クラス毎の skillLevels 初期値を生成。
+// 初期習得スキル: Lv1 / 未習得: Lv0
+function buildInitialSkillLevels(classKey) {
+  const skills = SKILLS[classKey] || [];
+  const skillLevels = {};
+  const learnedList = SKILLS_INITIAL_LEARNED[classKey];
+  if (!learnedList) {
+    // SKILLS_INITIAL_LEARNEDに無いクラス(boss等) → 全部Lv1
+    skills.forEach((s, i) => { skillLevels[i] = 1; });
+  } else {
+    skills.forEach((s, i) => {
+      skillLevels[i] = learnedList.includes(i) ? 1 : 0;
+    });
+  }
+  return skillLevels;
+}
+

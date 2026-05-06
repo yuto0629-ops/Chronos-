@@ -395,9 +395,8 @@ function confirmParty() {
     const cls = CLASSES[classKey];
     const lv = 1;
     const maxHP = cls.hp_base + (cls.hp_per_level * (lv - 1));
-    const skills = SKILLS[classKey] || [];
-    const skillLevels = {};
-    skills.forEach((s, i) => { skillLevels[i] = 1; });
+    // ★Phase 1: 初期習得スキルのみLv1、残りはLv0(未習得)
+    const skillLevels = buildInitialSkillLevels(classKey);
     const charName = pickCharName(classKey, usedNames);
     if (charName) usedNames.push(charName);
     return {
@@ -542,9 +541,8 @@ function confirmCustomParty() {
     const cls = CLASSES[classKey];
     const lv = 1;
     const maxHP = cls.hp_base + (cls.hp_per_level * (lv - 1));
-    const skills = SKILLS[classKey] || [];
-    const skillLevels = {};
-    skills.forEach((s, i) => { skillLevels[i] = 1; });
+    // ★Phase 1: 初期習得スキルのみLv1、残りはLv0(未習得)
+    const skillLevels = buildInitialSkillLevels(classKey);
     const charName = pickCharName(classKey, usedNames);
     if (charName) usedNames.push(charName);
     return {
