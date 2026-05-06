@@ -421,6 +421,14 @@ function confirmParty() {
   state.cleared = [];
   state.available = ['trivial_plain'];
   state.inventory = [];
+  // ★FIX: 新規ゲーム時に漏れていたstateリセット項目を追加
+  state.clearedSubMissions = [];
+  state.keys = { gold: 0, blue: 0 };
+  state.chestsOpened = [];
+  state.routeFlags = {};
+  state.currentSubMissionId = null;
+  state.currentAreaBackup = null;
+  state.currentMission = null;
 
   goTo('map');
 }
@@ -560,6 +568,14 @@ function confirmCustomParty() {
   state.cleared = [];
   state.available = ['trivial_plain'];
   state.inventory = [];
+  // ★FIX: 新規ゲーム時に漏れていたstateリセット項目を追加(custom版)
+  state.clearedSubMissions = [];
+  state.keys = { gold: 0, blue: 0 };
+  state.chestsOpened = [];
+  state.routeFlags = {};
+  state.currentSubMissionId = null;
+  state.currentAreaBackup = null;
+  state.currentMission = null;
 
   closeCustomPartyPicker();
   goTo('map');
