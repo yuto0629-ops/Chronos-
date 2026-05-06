@@ -2772,23 +2772,6 @@ function onMissionVictory() {
   const isReplay = (state.currentSubMissionId && state.clearedSubMissions.includes(state.currentSubMissionId))
                 || (!state.currentSubMissionId && state.cleared.includes(missionId));
 
-  // ★★★DEBUG-V2: 画面に固定表示(原因特定用、確認後削除)
-  try {
-    const dbg = document.createElement('div');
-    dbg.style.cssText = 'position:fixed;top:10px;left:10px;background:rgba(0,0,0,0.92);color:#0f0;padding:12px;font-size:11px;font-family:monospace;z-index:99999;border:2px solid #0f0;max-width:90vw;white-space:pre-wrap;line-height:1.5;border-radius:4px;';
-    dbg.textContent = `🔍 DEBUG (タップで閉じる)
-missionId: ${missionId}
-currentSubMissionId: ${state.currentSubMissionId}
-clearedSubMissions: [${(state.clearedSubMissions||[]).join(', ')}]
-cleared: [${(state.cleared||[]).join(', ')}]
-isReplay: ${isReplay}
-hasReplayCondA: ${!!(state.currentSubMissionId && state.clearedSubMissions.includes(state.currentSubMissionId))}
-hasReplayCondB: ${!!(!state.currentSubMissionId && state.cleared.includes(missionId))}`;
-    dbg.onclick = () => dbg.remove();
-    document.body.appendChild(dbg);
-    console.log(dbg.textContent);
-  } catch(e) { console.error(e); }
-
   // パーティのHP状態を保存(ペット除外)
   const allyUnits = battle.units.filter(u => u.side === 'ally' && !u.isPet);
   state.partyData.forEach((pd, i) => {
@@ -3451,15 +3434,10 @@ function showRewardScreen(mission, expGained, levelUps) {
     subMission = mission.missions.find(m => m.id === subMissionId);
   }
 
-  // ★再挑戦時(クリア済みミッション)は報酬出さずに直接マップへ
-  const isReplay = (subMissionId && state.clearedSubMissions.includes(subMissionId))
-                || (!subMissionId && state.cleared.includes(mission.id));
-  if (isReplay) {
-    state.currentSubMissionId = null;
-    addLogEquipToast('再挑戦のため報酬なし');
-    setTimeout(() => goTo('map'), 100);
-    return;
-  }
+  // ★FIX: ここでの isReplay 判定は削除。
+  // onMissionVictory() で既にクリア記録(clearedSubMissions.push)済みのため、
+  // ここで再判定すると初回クリアでも必ず true になり「再挑戦のため報酬なし」と誤表示されていた。
+  // 再挑戦時は onMissionVictory 側で先に return しているので、ここに来る時点で常に初回。
 
   if (subMission && subMission.rewardType) {
     showSubMissionReward(mission, subMission, expGained);
