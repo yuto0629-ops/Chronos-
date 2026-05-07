@@ -164,6 +164,38 @@ function scalePassiveByLevel(basePassive, lv) {
   if (basePassive.rangedDmgBonus) {
     p.rangedDmgBonus = basePassive.rangedDmgBonus + (lv - 1) * 2; // Lv1=3, Lv5=11
   }
+  // ★FIX: 英雄の威風など、隣接味方に装甲ボーナス
+  // Lv1=[1,1,0], Lv2=[1,1,1], Lv3=[2,2,1], Lv4=[2,2,1], Lv5=[3,3,2]
+  if (basePassive.auraArmorBonus) {
+    const tableM = [1, 1, 2, 2, 3];   // 近接
+    const tableR = [1, 1, 2, 2, 3];   // 遠隔
+    const tableS = [0, 1, 1, 1, 2];   // 魔法
+    const idx = Math.max(0, Math.min(4, lv - 1));
+    p.auraArmorBonus = [tableM[idx], tableR[idx], tableS[idx]];
+  }
+  // ★FIX: 癒しの祈り(Healer) - 隣接味方ターン開始時HP回復
+  // Lv1=4, Lv2=5, Lv3=6, Lv4=7, Lv5=8
+  if (basePassive.auraHealOnTurn) {
+    p.auraHealOnTurn = basePassive.auraHealOnTurn + (lv - 1);
+  }
+  // ★FIX: 反射神経(Gladiator) - 範囲攻撃軽減
+  // Lv1=30%, Lv5=50%
+  if (basePassive.aoeReduction) {
+    p.aoeReduction = Math.min(0.6, basePassive.aoeReduction + (lv - 1) * 0.05);
+  }
+  // ★FIX: 猟師の技(Jungleman) - 状態異常成功率
+  // Lv1=+20, Lv2=+25, Lv3=+30, Lv4=+35, Lv5=+40
+  if (basePassive.statusBonus) {
+    p.statusBonus = basePassive.statusBonus + (lv - 1) * 5;
+  }
+  // ★FIX: 瘴気(Serpent) - 周囲魔法ダメージ
+  // damage Lv1=5, Lv2=6, Lv3=7, Lv4=8, Lv5=9
+  if (basePassive.auraDamage) {
+    p.auraDamage = {
+      ...basePassive.auraDamage,
+      damage: basePassive.auraDamage.damage + (lv - 1),
+    };
+  }
   // multiAction(2匹一組)はLvで増えない(2固定、不便すぎる)
   // summonOnStartは「ペットLv連動」で別実装
   return p;
@@ -1305,6 +1337,48 @@ function showSkillDetail(kind, idx) {
     if (scaled.rangedDmgBonus) {
       currentParts.push(`遠距離・魔法ダメージ +${scaled.rangedDmgBonus}`);
       if (nextScaled) nextParts.push(`遠距離・魔法ダメージ +${nextScaled.rangedDmgBonus}`);
+    }
+    // ★FIX: 英雄の威風 (Champion)
+    if (scaled.auraArmorBonus) {
+      const a = scaled.auraArmorBonus;
+      currentParts.push(`隣接味方の装甲 近+${a[0]} / 遠+${a[1]} / 魔+${a[2]}`);
+      if (nextScaled && nextScaled.auraArmorBonus) {
+        const n = nextScaled.auraArmorBonus;
+        nextParts.push(`隣接味方の装甲 近+${n[0]} / 遠+${n[1]} / 魔+${n[2]}`);
+      }
+    }
+    // ★FIX: 癒しの祈り (Healer)
+    if (scaled.auraHealOnTurn) {
+      currentParts.push(`ターン開始時、隣接仲間のHPを +${scaled.auraHealOnTurn} 回復`);
+      if (nextScaled && nextScaled.auraHealOnTurn) {
+        nextParts.push(`隣接仲間のHPを +${nextScaled.auraHealOnTurn} 回復`);
+      }
+    }
+    // ★FIX: 反射神経 (Gladiator)
+    if (scaled.aoeReduction) {
+      currentParts.push(`範囲攻撃のダメージを ${Math.round(scaled.aoeReduction * 100)}% 軽減`);
+      if (nextScaled && nextScaled.aoeReduction) {
+        nextParts.push(`範囲攻撃のダメージを ${Math.round(nextScaled.aoeReduction * 100)}% 軽減`);
+      }
+    }
+    // ★FIX: 猟師の技 (Jungleman)
+    if (scaled.statusBonus) {
+      currentParts.push(`状態異常付与の確率 +${scaled.statusBonus}%`);
+      if (nextScaled && nextScaled.statusBonus) {
+        nextParts.push(`状態異常付与の確率 +${nextScaled.statusBonus}%`);
+      }
+    }
+    // ★FIX: 瘴気 (Serpent)
+    if (scaled.auraDamage) {
+      currentParts.push(`ターン開始時、${scaled.auraDamage.range}マス以内の敵に 魔法${scaled.auraDamage.damage} ダメージ`);
+      if (nextScaled && nextScaled.auraDamage) {
+        nextParts.push(`${nextScaled.auraDamage.range}マス以内の敵に 魔法${nextScaled.auraDamage.damage} ダメージ`);
+      }
+    }
+    // ★ 盗賊団首領のフレーバー専用パッシブ
+    if (basePassive.flavorOnly) {
+      currentParts = [basePassive.desc];
+      nextParts = [];
     }
 
     const currentText = currentParts.length > 0 ? currentParts.join('<br>') : basePassive.desc;
@@ -2773,8 +2847,26 @@ function killUnit(unit) {
 
   renderBattle();
 
-  // 勝敗判定
-  setTimeout(checkBattleEnd, 200);
+  // 勝敗判定 → 終わってなければターン進行チェック
+  setTimeout(() => {
+    if (checkBattleEnd()) return;  // 勝敗ついたら終了
+
+    // ★FIX: 死んだのが現在のターンキャラ(または死んだペットの主人)なら自動でターン進行
+    // 待機ボタン押さないと進まない問題を解消
+    const cur = battle.units[battle.currentUnitIdx];
+    if (cur && cur.dead) {
+      // ハイライト解除
+      document.querySelectorAll('.grid-cell.move-range, .grid-cell.dash-range, .grid-cell.attack-range').forEach(c => {
+        c.classList.remove('move-range', 'dash-range', 'attack-range', 'has-target', 'aoe-target', 'aoe-preview', 'aoe-preview-center');
+        c.onclick = null;
+      });
+      battle.attackMode = false;
+      battle.selectedSkill = null;
+      battle.aoeAimAt = null;
+      document.body.classList.remove('attack-mode');
+      setTimeout(() => nextTurn(), 500);
+    }
+  }, 200);
 }
 
 // ====== 勝敗判定 ======
