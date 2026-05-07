@@ -39,6 +39,27 @@ function makeUnit(opts) {
   // スキルにindexを付与してコピー
   const skillsWithIdx = skills.map((s, i) => ({ ...s, _skillIdx: i }));
 
+  // ★敵専用: skillLevelsをLvに応じて自動生成(味方と同じ公式)
+  // SP = level - 1 を全スキルに均等振り。Lv1=全スキルLv1、Lv5=4SP振りで分散
+  let enemySkillLevels = null;
+  if (opts.side === 'enemy' && skills.length > 0) {
+    enemySkillLevels = {};
+    skills.forEach((_, i) => { enemySkillLevels[i] = 1; });
+    let sp = Math.max(0, lv - 1);
+    let i = 0;
+    // スキルLv上限5
+    while (sp > 0) {
+      const targetIdx = i % skills.length;
+      if (enemySkillLevels[targetIdx] < 5) {
+        enemySkillLevels[targetIdx]++;
+        sp--;
+      }
+      i++;
+      // 全スキルLv5に達したら抜ける
+      if (i > skills.length * 5) break;
+    }
+  }
+
   return {
     id: opts.id,
     classKey: opts.classKey,
@@ -68,7 +89,7 @@ function makeUnit(opts) {
     actionsRemaining: passive && passive.multiAction ? passive.multiAction : 1,
     isPet: false,
     ownerId: null,
-    skillLevels: null,  // initBattleでpartyDataから移植する
+    skillLevels: enemySkillLevels,  // ★敵: 自動生成、味方: initBattleでpartyDataから移植
   };
 }
 
@@ -2134,10 +2155,11 @@ function applyDamage(attacker, target, skill) {
     equipCritBonus = attacker.equipBonuses.crit;
   }
 
-  // スキルLvボーナス(味方のみ)
+  // スキルLvボーナス
+  // ★味方/敵 共通: skillLevelsから個別スキルLvを参照(makeUnitで敵にも自動振り分け済み)
   let skillLvDmgBonus = 0;
   let skillLvCritBonus = 0;
-  if (attacker.side === 'ally' && attacker.skillLevels && skill._skillIdx !== undefined) {
+  if (attacker.skillLevels && skill._skillIdx !== undefined) {
     const sLv = attacker.skillLevels[skill._skillIdx] || 1;
     // Lv1=0, Lv2=+5, Lv3=+10, Lv4=+18, Lv5=+28 のような累進(合計値)
     const dmgTable = [0, 5, 10, 18, 28];

@@ -18,6 +18,13 @@ function goTo(screen) {
   // charName未付与のメンバーがいれば自動付与(古いデータ対策)
   ensureCharNames();
 
+  // ★FIX: 画面遷移時に過去の報酬/モーダルオーバーレイを完全クリーンアップ
+  // (これをやらないと screen-battle 内に reward-overlay が残り、
+  //  次の戦闘画面で表示された時に過去の報酬画面が見えてしまう)
+  document.querySelectorAll(
+    '.reward-overlay, .warrior-pick-overlay, .item-pick-overlay, .skill-modal-overlay, .battle-result, .xp-gain-overlay, .custom-party-overlay, .tavern-overlay'
+  ).forEach(o => o.remove());
+
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(`screen-${screen}`);
   if (target) target.classList.add('active');
