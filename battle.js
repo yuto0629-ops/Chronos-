@@ -521,7 +521,7 @@ function processStatusEffects(unit) {
       // 毒ダメージ(防御無視)
       const dmg = status.dmg || 5;
       unit.hp = Math.max(0, unit.hp - dmg);
-      showDamagePopup(unit, dmg, false);
+      showDamagePopup(unit, dmg, false, 'poison');
       addLog(`${unit.name} は<span style="color:#88e060">毒</span>で${dmg}ダメージ`);
       flashUnit(unit, 'poison');
     }
@@ -2453,14 +2453,18 @@ function showHealPopup(unit, amount) {
 }
 
 // ====== 演出: ダメージポップアップ(Crit時は大きく派手に) ======
-function showDamagePopup(unit, amount, isCrit) {
+function showDamagePopup(unit, amount, isCrit, kind) {
   const grid = document.getElementById('battle-grid');
   if (!grid) return;
   const cell = grid.children[unit.y * BATTLE_W + unit.x];
   if (!cell) return;
 
   const popup = document.createElement('div');
-  popup.className = 'damage-popup' + (isCrit ? ' crit' : '');
+  // ★kind === 'poison' なら緑色クラス追加
+  let extraClass = '';
+  if (isCrit) extraClass += ' crit';
+  if (kind === 'poison') extraClass += ' poison-dmg';
+  popup.className = 'damage-popup' + extraClass;
   popup.textContent = isCrit ? `${amount}!` : `${amount}`;
   // セル中央に配置
   popup.style.left = '50%';
@@ -4463,7 +4467,15 @@ function renderBattle() {
     const isCurrent = battle.units[battle.currentUnitIdx] === u;
     const isStunned = u.statuses && u.statuses.some(s => s.type === 'stun');
     const petClass = u.isPet ? 'pet' : '';
-    unitEl.className = `unit ${u.side} ${isCurrent ? 'active-turn' : ''} ${isStunned ? 'stunned' : ''} ${petClass}`;
+    // ★攻撃UPバフ中は赤いオーラ(重ねがけ数で強さ変動)
+    const atkBuffCount = u.statuses ? u.statuses.filter(s => s.type === 'buff_atk').length : 0;
+    let buffAuraClass = '';
+    if (atkBuffCount === 1) buffAuraClass = 'buff-atk-aura';
+    else if (atkBuffCount >= 2) buffAuraClass = 'buff-atk-aura buff-stack-2';
+    // ★毒状態は緑のオーラ
+    const isPoisoned = u.statuses && u.statuses.some(s => s.type === 'poison');
+    const poisonAuraClass = isPoisoned ? 'poison-aura' : '';
+    unitEl.className = `unit ${u.side} ${isCurrent ? 'active-turn' : ''} ${isStunned ? 'stunned' : ''} ${petClass} ${buffAuraClass} ${poisonAuraClass}`;
     // ユニットタップでステータス表示(攻撃モード中はクリック動作優先)
     unitEl.addEventListener('click', (e) => {
       if (battle.attackMode) return; // 攻撃モード中は通常のクリック処理
@@ -4481,10 +4493,12 @@ function renderBattle() {
       </div>
     `;
 
-    // 状態異常アイコン
+    // 状態異常アイコン(★攻撃UPと毒はオーラで表現するためアイコン除外)
     const statusIconsHTML = u.statuses && u.statuses.length > 0 ? `
       <div class="unit-status-icons">
         ${u.statuses.map(s => {
+          // ★buff_atk と poison はオーラで表現するためアイコン非表示
+          if (s.type === 'buff_atk' || s.type === 'poison') return '';
           const def = STATUS_EFFECTS[s.type];
           if (!def) return '';
           // 同種の状態は集約してカウント表示(主に毒)
