@@ -508,3 +508,73 @@ function buildInitialSkillLevels(classKey) {
   return skillLevels;
 }
 
+// ★Phase 2 Step 3: クラスのランク分類
+// common/rare/epic = 仲間勧誘で出る基本ランク
+// event = ストーリー進行で加入(普段の勧誘では出ない)
+// enemy_only = 仲間にならない(敵専用)
+const CLASS_RANKS = {
+  // common (4種): 標準的な勧誘候補、序盤に多く出る
+  monk:        'common',
+  healer:      'common',
+  barbarian:   'common',
+  archer:      'common',
+
+  // rare (3種): 中盤の特別な勧誘候補
+  jungleman:   'rare',
+  alchemist:   'rare',
+  ranger:      'rare',
+
+  // epic (5種): 主人公格・ボス前後でしか出ない
+  champion:    'epic',
+  knight:      'epic',
+  gladiator:   'epic',
+  beastmaster: 'epic',
+  rocketeer:   'epic',
+
+  // event (2種): イベント限定加入
+  hound:       'event',
+  badger:      'event',
+
+  // enemy_only (3種): 仲間にならない(敵専用)
+  coyote:      'enemy_only',
+  serpent:     'enemy_only',
+  bandit_boss: 'enemy_only',
+};
+
+// ランク → そのランクに該当するクラスの配列(逆引き、勧誘ロジックで使う)
+function getClassesByRank(rank) {
+  return Object.keys(CLASS_RANKS).filter(k => CLASS_RANKS[k] === rank);
+}
+
+// ★Phase 2 Step 3: アイテムのランク分類
+// data_items.json の value を基準に振り分け
+const ITEM_RANKS = {
+  // === common (低価値、序盤向け) ===
+  stale_bread:      'common',
+  fresh_bread:      'common',
+  scone:            'common',
+  cup_wine:         'common',
+  tattered_tunic:   'common',
+  leather_cap:      'common',
+  leather_tunic:    'common',
+  skullcap:         'common',
+  parchment_skill:  'common',
+
+  // === rare (中価値、中盤向け) ===
+  horn_plenty:      'rare',
+  stone_strength:   'rare',
+  book_skill:       'rare',
+  emblem_swords:    'rare',
+  stone_might:      'rare',
+  leather_boots:    'rare',
+
+  // === epic (高価値、ボス前後) ===
+  sturdy_helm:      'epic',
+  stone_power:      'epic',
+};
+
+// ランク → そのランクに該当するアイテムキーの配列(逆引き)
+function getItemsByRank(rank) {
+  return Object.keys(ITEM_RANKS).filter(k => ITEM_RANKS[k] === rank);
+}
+
