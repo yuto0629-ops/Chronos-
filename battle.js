@@ -4357,6 +4357,111 @@ function executeSkillEnemy(attacker, target, skill) {
   attacker.st -= skill.cost;
   attacker.hasAttacked = true;
 
+  // ★FIX: 敵の範囲攻撃(Whirlwind等)も8マス全展開
+  if ((skill.status === 'aoe_around' || skill.status === 'daze_aoe' || skill.status === 'poison_aoe') && skill.damage >= 0) {
+    addLog(`<span style="color:#ffaa44">${attacker.name} の${skill.name}!【範囲攻撃】</span>`);
+
+    // 範囲セル座標(攻撃者周囲8マス)
+    const aoeCells = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        aoeCells.push({x: attacker.x + dx, y: attacker.y + dy});
+      }
+    }
+    // エフェクト
+    playAoeFlash(aoeCells);
+    playSkillEffect(skill, aoeCells, attacker);
+    if (skill.status === 'aoe_around') {
+      playBackgroundFlash('rgba(255, 200, 80, 0.3)');
+      setTimeout(() => playScreenShake('medium'), 100);
+    } else if (skill.status === 'daze_aoe') {
+      playBackgroundFlash('rgba(180, 130, 255, 0.25)');
+    } else if (skill.status === 'poison_aoe') {
+      playBackgroundFlash('rgba(120, 220, 80, 0.25)');
+    }
+
+    // 範囲内の敵対勢力(=味方)全員にダメージ。攻撃者自身は対象外
+    const victims = [];
+    aoeCells.forEach(({x, y}) => {
+      const t = battle.units.find(u => !u.dead && u.x === x && u.y === y && u.id !== attacker.id);
+      if (t) victims.push(t);
+    });
+    victims.forEach(t => {
+      if (skill.damage > 0) {
+        applyDamage(attacker, t, skill);
+        applyStDrainFromSkill(skill, t);
+      } else {
+        applyStatusFromSkill(skill, t, attacker);
+      }
+    });
+    setTimeout(() => {
+      victims.forEach(t => {
+        if (t.hp <= 0 && !t.dead) {
+          t.hp = 0;
+          killUnit(t);
+        }
+      });
+    }, 600);
+    renderBattle();
+    return;
+  }
+
+  // ★前方3マス直線攻撃(Daring Strike等)も対応
+  if (skill.status === 'aoe_3' && skill.damage > 0) {
+    addLog(`<span style="color:#ffaa44">${attacker.name} の${skill.name}!【前方3マス】</span>`);
+    // 攻撃者からターゲット方向を求める
+    const dx = Math.sign(target.x - attacker.x);
+    const dy = Math.sign(target.y - attacker.y);
+    const lineCells = [];
+    for (let i = 1; i <= 3; i++) {
+      lineCells.push({x: attacker.x + dx * i, y: attacker.y + dy * i});
+    }
+    playAoeFlash(lineCells);
+    playSkillEffect(skill, lineCells, attacker);
+    const victims = [];
+    lineCells.forEach(({x, y}) => {
+      const t = battle.units.find(u => !u.dead && u.x === x && u.y === y && u.id !== attacker.id);
+      if (t) victims.push(t);
+    });
+    victims.forEach(t => applyDamage(attacker, t, skill));
+    setTimeout(() => {
+      victims.forEach(t => {
+        if (t.hp <= 0 && !t.dead) { t.hp = 0; killUnit(t); }
+      });
+    }, 600);
+    renderBattle();
+    return;
+  }
+
+  // ★範囲2マス攻撃(Yellow Tiger / Flame Potion等)
+  if (skill.status === 'aoe_2' && skill.damage > 0) {
+    addLog(`<span style="color:#ffaa44">${attacker.name} の${skill.name}!【範囲2】</span>`);
+    // ターゲット中心の周囲(target含む)
+    const aoeCells = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        aoeCells.push({x: target.x + dx, y: target.y + dy});
+      }
+    }
+    playAoeFlash(aoeCells);
+    playSkillEffect(skill, aoeCells, attacker);
+    const victims = [];
+    aoeCells.forEach(({x, y}) => {
+      const t = battle.units.find(u => !u.dead && u.x === x && u.y === y && u.id !== attacker.id);
+      if (t) victims.push(t);
+    });
+    victims.forEach(t => applyDamage(attacker, t, skill));
+    setTimeout(() => {
+      victims.forEach(t => {
+        if (t.hp <= 0 && !t.dead) { t.hp = 0; killUnit(t); }
+      });
+    }, 600);
+    renderBattle();
+    return;
+  }
+
+  // 通常の単体攻撃
   applyDamage(attacker, target, skill);
   applyStDrainFromSkill(skill, target);
 
