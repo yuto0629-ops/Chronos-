@@ -1745,16 +1745,8 @@ function showAttackRange(unit) {
   const isHeal = skill.damage < 0 || skill.status === 'heal';
   const isSelfTarget = range === 0;
 
-  // 自分対象のスキル(Snake Rage、Detonate、Battle Shoutなど)
-  if (isSelfTarget) {
-    const cell = grid.children[unit.y * BATTLE_W + unit.x];
-    cell.classList.add('attack-range', 'has-target');
-    cell.onclick = () => executeSkill(unit, unit.x, unit.y, unit, null);
-    return;
-  }
-
-  // ★aoe_around / daze_aoe / poison_aoe (Whirlwind/Roar/毒薬等): 攻撃者の周囲8マスにダメージ。ターゲット選択不要
-  // 自分のマスをタップで発動させる
+  // ★aoe_around / daze_aoe / poison_aoe (Whirlwind/Roar/毒薬/Detonate等): 攻撃者の周囲8マスにダメージ
+  // ★FIX: Detonate(range=0かつaoe_around)はここで捕まえる(isSelfTargetより先に判定)
   if (skill.status === 'aoe_around' || skill.status === 'daze_aoe' || skill.status === 'poison_aoe') {
     const cell = grid.children[unit.y * BATTLE_W + unit.x];
     cell.classList.add('attack-range', 'has-target');
@@ -1770,6 +1762,14 @@ function showAttackRange(unit) {
         if (target) ncell.classList.add('has-target');
       }
     }
+    cell.onclick = () => executeSkill(unit, unit.x, unit.y, unit, null);
+    return;
+  }
+
+  // 自分対象のスキル(Snake Rage、Battle Shoutなど。aoe_aroundは上で処理済み)
+  if (isSelfTarget) {
+    const cell = grid.children[unit.y * BATTLE_W + unit.x];
+    cell.classList.add('attack-range', 'has-target');
     cell.onclick = () => executeSkill(unit, unit.x, unit.y, unit, null);
     return;
   }
