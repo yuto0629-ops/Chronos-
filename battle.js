@@ -3084,9 +3084,10 @@ function showSubMissionReward(mission, subMission, expGained) {
 
   // ★starter_pack: EXP(済) + ランダムアイテム1個(自動付与) + ランダム仲間1人
   if (rewardType === 'starter_pack') {
-    // 1. ランダムアイテム自動付与
-    const itemKeys = Object.keys(ITEMS);
-    const randomItem = itemKeys[Math.floor(Math.random() * itemKeys.length)];
+    // 1. ランダムアイテム自動付与 (★Phase 2 Step 3: commonランクから)
+    let starterPool = getItemsByRank('common');
+    if (starterPool.length === 0) starterPool = Object.keys(ITEMS);
+    const randomItem = starterPool[Math.floor(Math.random() * starterPool.length)];
     if (!state.inventory) state.inventory = [];
     state.inventory.push(randomItem);
     const itemDef = ITEMS[randomItem];
@@ -3105,9 +3106,22 @@ function showSubMissionReward(mission, subMission, expGained) {
   }
 
   if (rewardType === 'item') {
-    // アイテム選択モーダル: 3つのランダムアイテムから1つ
-    const itemKeys = Object.keys(ITEMS);
-    const candidates = pickRandomItems(itemKeys, 3);
+    // ★Phase 2 Step 3: 難易度+BLUEゲートからランク抽選してそのランクのアイテムから選ぶ
+    const difficulty = subMission.difficulty || 'easy';
+    const isBlueGate = !!(subMission.blueGate || mission.blueGate);
+    // 3候補を出すが、それぞれ別ランクで抽選するとバラエティが出る
+    const candidates = [];
+    for (let i = 0; i < 3; i++) {
+      const rank = rollRewardRank(difficulty, isBlueGate);
+      let pool = getItemsByRank(rank);
+      // フォールバック(空ならcommon、それでも空なら全アイテム)
+      if (pool.length === 0) pool = getItemsByRank('common');
+      if (pool.length === 0) pool = Object.keys(ITEMS);
+      // 同候補との重複を避ける
+      const filtered = pool.filter(k => !candidates.includes(k));
+      const usePool = filtered.length > 0 ? filtered : pool;
+      candidates.push(usePool[Math.floor(Math.random() * usePool.length)]);
+    }
     showItemPickModal(candidates);
     return;
   }
@@ -3303,31 +3317,43 @@ function generateSubMissionWarriorOptions(subMission, area) {
     ? Math.max(1, Math.round(state.partyData.reduce((s, pd) => s + pd.level, 0) / state.partyData.length))
     : 1;
 
-  // ★レアイベント判定(10%)
-  const isRare = Math.random() < 0.10;
-  let pool;
-  let levelBoost = 0;
-
-  if (isRare) {
-    // レアプール: 強職業 + Lvブースト
-    pool = ['champion', 'knight', 'rocketeer', 'beastmaster'];
-    levelBoost = 2; // Lv +2
-  } else {
-    // 通常プール: ステージ指定 → エリア指定 → デフォルト
-    pool = subMission.warriorPool
-        || area.warriorPool
-        || ['barbarian', 'monk', 'archer', 'gladiator', 'jungleman', 'healer'];
-  }
+  // ★Phase 2 Step 3: 難易度+BLUEゲートからランク確率を決定
+  const difficulty = subMission.difficulty || 'easy';
+  const isBlueGate = !!(subMission.blueGate || area.blueGate);
+  // 各候補ごとにランクを抽選(3人で違うランクが出る可能性あり)
+  // common→通常、rare→中堅、epic→主人公格Lv+1、event→ストーリー限定なので除外
+  // pool は最終的にランクから決まる
+  const defaultPool = subMission.warriorPool
+    || area.warriorPool
+    || null;  // 指定無ければランクで自動選定
 
   // 3人分の候補を生成
   const candidates = [];
   const usedNamesGlobal = state.partyData.map(p => p.charName).filter(Boolean);
 
   for (let i = 0; i < 3; i++) {
+    // ★各候補ごとにランク抽選
+    const rank = rollRewardRank(difficulty, isBlueGate);
+    let pool;
+    let levelBoost = 0;
+
+    if (defaultPool) {
+      // ステージ指定があれば優先(従来通り)
+      pool = defaultPool;
+    } else {
+      // ランクから自動プール選定
+      pool = getClassesByRank(rank);
+      // フォールバック(空なら common にする)
+      if (pool.length === 0) pool = getClassesByRank('common');
+    }
+
+    // epicランクの仲間はLv+1ブースト
+    if (rank === 'epic') levelBoost = 1;
+
     const classKey = pool[Math.floor(Math.random() * pool.length)];
     const cls = CLASSES[classKey];
 
-    // レベル: 平均±1(レア時はブースト)
+    // レベル: 平均±1 + ランクブースト
     const baseLv = Math.max(1, avgLv - 1 + Math.floor(Math.random() * 3)); // -1, 0, +1
     const lv = baseLv + levelBoost;
     const maxHP = cls.hp_base + (cls.hp_per_level * (lv - 1));
@@ -3337,11 +3363,9 @@ function generateSubMissionWarriorOptions(subMission, area) {
     const basicAtk = BASIC_ATTACKS[classKey];
     let skillSet = [];
     if (basicAtk) {
-      // 基本攻撃をスキル一覧から探す
       const basicIdx = allSkills.findIndex(s => s.name === basicAtk.name);
       if (basicIdx >= 0) skillSet.push(basicIdx);
     }
-    // 残りからランダムに2つ
     const otherIndices = allSkills.map((_, idx) => idx).filter(idx => !skillSet.includes(idx));
     while (skillSet.length < 3 && otherIndices.length > 0) {
       const pickIdx = Math.floor(Math.random() * otherIndices.length);
@@ -3349,16 +3373,13 @@ function generateSubMissionWarriorOptions(subMission, area) {
     }
     skillSet.sort((a, b) => a - b);
 
-    // skillLevels初期化(全スキルLv1、ただし所持してないスキルは null扱いで残しておく)
     const skillLevels = {};
     allSkills.forEach((s, idx) => {
-      skillLevels[idx] = skillSet.includes(idx) ? 1 : 0; // 0 = 未習得
+      skillLevels[idx] = skillSet.includes(idx) ? 1 : 0;
     });
 
-    // SP: lv - 1 分(プレイヤー振り分け)
     const skillPoints = Math.max(0, lv - 1);
 
-    // 名前
     const charName = pickCharName(classKey, [...usedNamesGlobal, ...candidates.map(c => c.charName).filter(Boolean)]);
 
     candidates.push({
@@ -3371,9 +3392,10 @@ function generateSubMissionWarriorOptions(subMission, area) {
       equipped: [],
       skillPoints,
       skillLevels,
-      ownedSkills: skillSet,  // ★所持してるスキルのindex配列(表示用)
+      ownedSkills: skillSet,
       passiveLevel: 1,
-      isRare,  // ★レア仲間フラグ
+      isRare: rank === 'epic',  // ★epic = レア仲間フラグ(UI互換のため残す)
+      rewardRank: rank,  // ★新規: 抽選されたランクを記録
     });
   }
 

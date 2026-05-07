@@ -578,3 +578,36 @@ function getItemsByRank(rank) {
   return Object.keys(ITEM_RANKS).filter(k => ITEM_RANKS[k] === rank);
 }
 
+// ★Phase 2 Step 3: 難易度→報酬ランク確率テーブル
+// 数値はパーセンテージ(合計100)。難しいほどレア/エピックの確率が上がる。
+const REWARD_RANK_TABLE = {
+  easy:    { common: 70, rare: 25, epic: 5 },
+  medium:  { common: 40, rare: 50, epic: 10 },
+  hard:    { common: 20, rare: 50, epic: 30 },
+  extreme: { common: 10, rare: 40, epic: 50 },
+};
+
+// BLUE GATE先のステージは難易度より一段強いランク確率にする(底上げ)。
+// 例: easy → medium相当、medium → hard相当
+const BLUEGATE_DIFFICULTY_BONUS = {
+  easy:    'medium',
+  medium:  'hard',
+  hard:    'extreme',
+  extreme: 'extreme',  // 既に最高なのでそのまま
+};
+
+// ミッションの難易度とBLUEゲートフラグから、ランク確率テーブルを返す
+function getRewardRankProbs(difficulty, isBlueGate) {
+  const effectiveDiff = isBlueGate ? (BLUEGATE_DIFFICULTY_BONUS[difficulty] || difficulty) : difficulty;
+  return REWARD_RANK_TABLE[effectiveDiff] || REWARD_RANK_TABLE.easy;
+}
+
+// 確率テーブルからランクを抽選
+function rollRewardRank(difficulty, isBlueGate) {
+  const probs = getRewardRankProbs(difficulty, isBlueGate);
+  const r = Math.random() * 100;
+  if (r < probs.common) return 'common';
+  if (r < probs.common + probs.rare) return 'rare';
+  return 'epic';
+}
+
