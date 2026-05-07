@@ -4345,6 +4345,25 @@ function actionWait() {
   else if (u.hasMoved) stGain = 15;
   u.st = Math.min(u.maxST, u.st + stGain);
 
+  // ★その場待機(移動なし)時のHP回復(原作: 4 + Lv十の位)
+  // 例: Lv1-9 → +4、Lv10-19 → +5、Lv20-29 → +6
+  if (!u.hasMoved && !u.hasDashed && !u.dead && u.hp < u.maxHP) {
+    const baseRegen = 4;
+    const lvBonus = Math.floor((u.level || 1) / 10);
+    let hpRegen = baseRegen + lvBonus;
+    // 装備のwait_hp(スコーン等)も加算
+    if (u.equipBonuses && u.equipBonuses.waitHP > 0) {
+      hpRegen += u.equipBonuses.waitHP;
+    }
+    const before = u.hp;
+    u.hp = Math.min(u.maxHP, u.hp + hpRegen);
+    const actualHeal = u.hp - before;
+    if (actualHeal > 0) {
+      showHealPopup(u, actualHeal);
+      addLog(`<span style="color:#6ec844">${u.name} 待機でHP+${actualHeal}回復</span>`);
+    }
+  }
+
   // ハイライト解除
   document.querySelectorAll('.grid-cell.move-range, .grid-cell.dash-range, .grid-cell.attack-range').forEach(c => {
     c.classList.remove('move-range', 'dash-range', 'attack-range', 'has-target', 'aoe-target', 'aoe-preview', 'aoe-preview-center');
