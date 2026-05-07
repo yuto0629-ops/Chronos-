@@ -12,6 +12,29 @@ const battle = {
   aoeAimAt: null,  // ★範囲攻撃の中心マス候補(2段階タップ用) {x, y}
 };
 
+// ★Phase 3 A-1: MaxST計算ヘルパー(原作仕様)
+// 個別スキルLvに基づいて MaxST を動的計算する
+// MaxST = 70 + (2番目高Atkスキル×2) + (3番目×4) + (4番目×6)
+function calcMaxST(classKey, skillLevels) {
+  const cls = CLASSES[classKey];
+  if (!cls) return 70;
+  if (cls.st_override) return cls.st_override;  // ボス等は固定値
+
+  const skills = SKILLS[classKey] || [];
+  // 攻撃スキル(damage > 0)の個別Lvを集める
+  const atkLevels = skills
+    .map((s, idx) => ({ skill: s, lv: (skillLevels && skillLevels[idx]) || 0 }))
+    .filter(x => x.skill.damage > 0 && x.lv > 0)  // 未習得は除外
+    .map(x => x.lv)
+    .sort((a, b) => b - a);
+
+  let maxST = 70;
+  if (atkLevels[1]) maxST += atkLevels[1] * 2;
+  if (atkLevels[2]) maxST += atkLevels[2] * 4;
+  if (atkLevels[3]) maxST += atkLevels[3] * 6;
+  return maxST;
+}
+
 // ユニット作成ヘルパー
 function makeUnit(opts) {
   const cls = CLASSES[opts.classKey];
@@ -21,9 +44,16 @@ function makeUnit(opts) {
   const skills = SKILLS[opts.classKey] || [];
   const passive = CLASS_PASSIVES[opts.classKey] || null;
 
-  // MaxST計算式
-  const atkSkills = skills.filter(s => s.damage > 0).map(s => lv);
-  const sorted = [...atkSkills].sort((a, b) => b - a);
+  // ★Phase 3 A-1: MaxST計算式(原作仕様)
+  // MaxST = 70 + (2番目高Atkスキル×2) + (3番目×4) + (4番目×6)
+  // 1番目は加算されない(=最低70はキープ)
+  // 個別のスキルLvで計算する(makeUnit時点ではまだskillLevels未代入なので、
+  //  仮にキャラLvで一律にしておく。後で initBattle 等で再計算する)
+  const atkSkillLevels = skills
+    .map((s, idx) => ({ skill: s, lv: lv }))  // 暫定: キャラLv均等
+    .filter(x => x.skill.damage > 0)
+    .map(x => x.lv);
+  const sorted = [...atkSkillLevels].sort((a, b) => b - a);
   let maxST = 70;
   if (sorted[1]) maxST += sorted[1] * 2;
   if (sorted[2]) maxST += sorted[2] * 4;
@@ -57,6 +87,10 @@ function makeUnit(opts) {
       i++;
       // 全スキルLv5に達したら抜ける
       if (i > skills.length * 5) break;
+    }
+    // ★Phase 3 A-1: 敵にもMaxSTを再計算(個別スキルLv反映)
+    if (!cls.st_override) {
+      maxST = calcMaxST(opts.classKey, enemySkillLevels);
     }
   }
 
@@ -292,6 +326,11 @@ function initBattle(missionId) {
     });
     // スキルLv引き継ぎ
     unit.skillLevels = pd.skillLevels || {};
+    // ★Phase 3 A-1: skillLevelsに応じてMaxSTを動的再計算
+    const newMaxST = calcMaxST(unit.classKey, unit.skillLevels);
+    // 装備による max_st ボーナスは equipBonuses で別途加算されるので、ここでは素のMaxSTのみ
+    unit.maxST = newMaxST;
+    unit.st = Math.min(unit.maxST, unit.st);  // 現在STをクランプ
     // パッシブLv引き継ぎ + パッシブをLvに応じて強化
     const pLv = pd.passiveLevel || 1;
     unit.passiveLevel = pLv;
@@ -720,19 +759,9 @@ function renderCharStats(pd) {
     return eq > 0 ? `<span style="color:#6c4;">(+${eq})</span>` : '';
   };
 
-  // ★MaxST 計算(原作仕様: Atkスキル所持の Lv降順 2位×2 + 3位×4 + 4位×6)
-  // SP制で各スキルのレベルを使う
-  const atkSkillLevels = skills
-    .filter(s => s.damage > 0)
-    .map((s, idx) => {
-      const realIdx = skills.indexOf(s);
-      return (pd.skillLevels && pd.skillLevels[realIdx]) || 1;
-    });
-  const sorted = [...atkSkillLevels].sort((a, b) => b - a);
-  let maxST = 70;
-  if (sorted[1]) maxST += sorted[1] * 2;
-  if (sorted[2]) maxST += sorted[2] * 4;
-  if (sorted[3]) maxST += sorted[3] * 6;
+  // ★Phase 3 A-1: MaxST計算をヘルパーで統一
+  // 未習得スキル(Lv0)は計算に含まない、原作仕様通り
+  let maxST = calcMaxST(pd.classKey, pd.skillLevels);
   maxST += maxStBonus;
 
   // ★代表スキル(攻撃)の値を計算
