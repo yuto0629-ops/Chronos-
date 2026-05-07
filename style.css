@@ -122,7 +122,7 @@
   .party-options {
     flex: 1;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
     min-height: 0;
   }
@@ -1331,10 +1331,13 @@
     filter: hue-rotate(0deg) saturate(0.4) brightness(0.55) contrast(1.1);
   }
   .unit-sprite.enemy-elite img {
-    filter: hue-rotate(270deg) saturate(1.2) brightness(0.75);
+    filter: drop-shadow(0 0 3px rgba(180, 80, 220, 0.85))
+            drop-shadow(0 0 8px rgba(120, 40, 180, 0.6));
   }
   .unit-sprite.enemy-boss img {
-    filter: hue-rotate(330deg) saturate(1.4) brightness(0.9);
+    filter: drop-shadow(0 0 4px rgba(200, 30, 30, 0.95))
+            drop-shadow(0 0 10px rgba(120, 0, 0, 0.75))
+            drop-shadow(0 0 18px rgba(80, 0, 0, 0.5));
   }
 
   /* ★攻撃UPバフ中のオーラ(赤いパルス) */
