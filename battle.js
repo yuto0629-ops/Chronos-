@@ -915,15 +915,21 @@ function renderCharDetail() {
 
   // スキル分類: 攻撃 / パッシブ
   // ★バフ・自分対象スキル(damage=0, range=0)も含める。passiveフラグなし=アクティブスキル全部
-  const attackSkills = skills.filter(s => !s.isPassive);
+  // ★FIX: 元のSKILLS配列でのindexを保持(_origIdx)、skillLevels参照のキーずれ防止
+  const attackSkills = skills
+    .map((s, origIdx) => ({ ...s, _origIdx: origIdx }))
+    .filter(s => !s.isPassive);
   const passiveSkills = passive ? [{ name_ja: passive.name, lv: pd.level, isPassive: true, desc: passive.desc }] : [];
 
   const skillPointsLeft = pd.skillPoints || 0;
-  const attackSkillsHTML = attackSkills.map((s, sIdx) => {
+  const attackSkillsHTML = attackSkills.map((s) => {
+    const sIdx = s._origIdx;  // ★元のSKILLS配列でのindex(skillLevelsはこれで参照)
     const rawLv = pd.skillLevels && (pd.skillLevels[sIdx] !== undefined) ? pd.skillLevels[sIdx] : 1;
     const isUnlearned = rawLv === 0;
     const sLv = isUnlearned ? 0 : rawLv;
-    const canUpgrade = skillPointsLeft > 0 && sLv < 5;
+    // ★Phase 2修正: 未習得スキルはLv10未満ならSP振り不可(報酬イベント限定)
+    const canSpUnlearn = isUnlearned && pd.level >= 10;
+    const canUpgrade = skillPointsLeft > 0 && sLv < 5 && (!isUnlearned || canSpUnlearn);
     const upBtn = canUpgrade
       ? `<button class="sp-up-btn" onclick="event.stopPropagation(); upgradeSkill(${sIdx})">+</button>`
       : '';
@@ -1077,6 +1083,14 @@ function upgradeSkill(sIdx) {
   const cur = pd.skillLevels[sIdx];
   // 未定義 → 1扱い、0(未習得) → 0、それ以外はそのまま
   const curLv = (cur === undefined) ? 1 : cur;
+
+  // ★Phase 2修正: 未習得(Lv0)スキルはSPで習得不可。
+  // 報酬イベントでのみ習得できる仕様。Lv10以上のキャラなら例外的にSP習得を許可。
+  if (curLv === 0 && pd.level < 10) {
+    addLogEquipToast('未習得スキルはイベント報酬で習得 (Lv10以降はSPで可)');
+    return;
+  }
+
   if (curLv >= 5) {
     addLogEquipToast('スキルLv上限(5)');
     return;
@@ -1123,8 +1137,8 @@ function showSkillDetail(kind, idx) {
 
   if (kind === 'attack') {
     const skills = SKILLS[pd.classKey] || [];
-    const attackSkills = skills.filter(s => !s.isPassive);
-    const s = attackSkills[idx];
+    // ★FIX: idxは renderCharDetail で _origIdx を渡すように修正済み = 元SKILLS配列のindex
+    const s = skills[idx];
     if (!s) return;
 
     const sLv = (pd.skillLevels && pd.skillLevels[idx]) || 1;
@@ -1442,7 +1456,9 @@ function showUnitStatusPopup(u) {
   const skillsList = skills.filter(s => s.damage !== 0 || s.range > 0).slice(0, 4).map(s => {
     const sLv = (u.skillLevels && u.skillLevels[s._skillIdx]) || 1;
     const dmgTable = [0, 5, 10, 18, 28];
-    const dBonus = u.side === 'ally' ? (dmgTable[sLv - 1] || 0) : 0;
+    // ★味方も敵もスキルLvでダメージ補正(makeUnitで敵にもskillLevels自動生成済み)
+    const totalBonus = dmgTable[sLv - 1] || 0;
+    const dBonus = Math.floor(totalBonus / Math.max(1, s.hits));
     const dmg = s.damage > 0 ? `${s.damage + dBonus}${s.hits > 1 ? '×' + s.hits : ''}` : '-';
     return `<div class="usp-skill">
       <span class="usp-skill-name">${s.name}</span>
