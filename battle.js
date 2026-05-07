@@ -3420,7 +3420,12 @@ function generateSubMissionWarriorOptions(subMission, area) {
       skillLevels[idx] = skillSet.includes(idx) ? 1 : 0;
     });
 
-    const skillPoints = Math.max(0, lv - 1);
+    // ★Phase 3 B-1: 仲間のスキルLv合計 = キャラLv + 2 (原作仕様)
+    // 持ってるスキル数(初期Lv1分)を引いた残りがSP
+    // 例: Lv4で2スキル持ち → 合計目標6、初期2 → SP振れる数=4
+    const skillTotalTarget = lv + 2;
+    const initialSkillCount = skillSet.length;
+    const skillPoints = Math.max(0, skillTotalTarget - initialSkillCount);
 
     const charName = pickCharName(classKey, [...usedNamesGlobal, ...candidates.map(c => c.charName).filter(Boolean)]);
 

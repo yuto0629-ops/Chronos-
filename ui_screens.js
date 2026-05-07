@@ -404,6 +404,9 @@ function confirmParty() {
     const maxHP = cls.hp_base + (cls.hp_per_level * (lv - 1));
     // ★Phase 1: 初期習得スキルのみLv1、残りはLv0(未習得)
     const skillLevels = buildInitialSkillLevels(classKey);
+    // ★Phase 3 B-1: スキルLv合計 = Lv + 2 (原作仕様)
+    const initialSkillCount = Object.values(skillLevels).filter(l => l > 0).length;
+    const skillPoints = Math.max(0, (lv + 2) - initialSkillCount);
     const charName = pickCharName(classKey, usedNames);
     if (charName) usedNames.push(charName);
     return {
@@ -414,7 +417,7 @@ function confirmParty() {
       maxHP: maxHP,
       exp: 0,
       equipped: [],
-      skillPoints: 0,
+      skillPoints,
       skillLevels,
       passiveLevel: 1,
     };
@@ -550,6 +553,9 @@ function confirmCustomParty() {
     const maxHP = cls.hp_base + (cls.hp_per_level * (lv - 1));
     // ★Phase 1: 初期習得スキルのみLv1、残りはLv0(未習得)
     const skillLevels = buildInitialSkillLevels(classKey);
+    // ★Phase 3 B-1: スキルLv合計 = Lv + 2 (原作仕様)
+    const initialSkillCount = Object.values(skillLevels).filter(l => l > 0).length;
+    const skillPoints = Math.max(0, (lv + 2) - initialSkillCount);
     const charName = pickCharName(classKey, usedNames);
     if (charName) usedNames.push(charName);
     return {
@@ -560,7 +566,7 @@ function confirmCustomParty() {
       maxHP: maxHP,
       exp: 0,
       equipped: [],
-      skillPoints: 0,
+      skillPoints,
       skillLevels,
       passiveLevel: 1,
     };
