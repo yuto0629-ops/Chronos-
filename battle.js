@@ -3668,18 +3668,25 @@ function showItemPickModal(itemKeys) {
     const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
     const colorJa = { orange: '食料系', blue: '装備系', pink: '魔法系' }[item.color];
 
+    // ★Phase 2 Step 3: epicランクならピンク枠
+    const isEpic = (typeof ITEM_RANKS !== 'undefined') && ITEM_RANKS[key] === 'epic';
+    const epicStyle = isEpic
+      ? 'border: 2px solid #ff3399; box-shadow: 0 0 12px rgba(255,51,153,0.6);'
+      : '';
+
     const card = document.createElement('div');
     card.className = 'reward-card';
+    if (isEpic) card.style.cssText = epicStyle;
     card.innerHTML = `
       <div class="reward-item-display ${colorClass}" style="width: 56px; height: 56px; font-size: 28px;">${icon}</div>
-      <div class="reward-card-title" style="font-size: 12px; margin-top: 4px;">${item.name_ja}</div>
+      <div class="reward-card-title" style="font-size: 12px; margin-top: 4px; ${isEpic ? 'color: #ff66bb;' : ''}">${item.name_ja}</div>
       <div style="font-size: 9px; color: #a8956e;">${colorJa}</div>
       <div class="reward-card-detail" style="font-size: 10px; color: #d4c5a9; margin-top: 6px;">${item.effect}</div>
-      <div style="font-size: 10px; color: #d4a020; margin-top: 4px; letter-spacing: 1px;">★ 価値 ${item.value}</div>
+      <div style="font-size: 10px; color: ${isEpic ? '#ff3399' : '#d4a020'}; margin-top: 4px; letter-spacing: 1px;">★ 価値 ${item.value}</div>
     `;
     card.onclick = () => {
       state.inventory.push(key);
-      addLog(`<span style="color:#d4a020">${item.name_ja} を獲得</span>`);
+      addLog(`<span style="color:${isEpic ? '#ff3399' : '#d4a020'}">${item.name_ja} を獲得</span>`);
       overlay.remove();
       goTo('map');
     };
@@ -3858,12 +3865,14 @@ function showWarriorPickModal(candidates) {
   const overlay = document.createElement('div');
   overlay.className = 'reward-overlay warrior-pick-overlay';
 
-  // レア判定(全員レアだったらタイトル変える)
-  const allRare = candidates.length > 0 && candidates.every(c => c.isRare);
+  // ★Phase 2 Step 3: epicランクをピンクで表示(rewardRankフィールドを使う、isRareは旧互換)
+  const isCandEpic = (c) => c.rewardRank === 'epic' || c.isRare;
+  // 全員epicだったらタイトル変える
+  const allEpic = candidates.length > 0 && candidates.every(c => isCandEpic(c));
 
   overlay.innerHTML = `
-    <div class="reward-title" style="font-size: ${allRare ? 14 : 13}px; margin-bottom: 2px; ${allRare ? 'color: #ffe080; text-shadow: 0 0 8px rgba(255, 220, 80, 0.8);' : ''}">
-      ${allRare ? '✨ レア仲間出現! ✨' : '🤝 仲間選択'}
+    <div class="reward-title" style="font-size: ${allEpic ? 14 : 13}px; margin-bottom: 2px; ${allEpic ? 'color: #ff66bb; text-shadow: 0 0 8px rgba(255, 51, 153, 0.8);' : ''}">
+      ${allEpic ? '✨ レア仲間出現! ✨' : '🤝 仲間選択'}
     </div>
     <div class="reward-options" id="warrior-pick-options" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; width: 100%; max-width: 700px; padding: 0 8px;"></div>
     <button class="btn" onclick="skipWarriorPick()" style="font-size: 9px; padding: 4px 12px; margin-top: 6px;">スキップ</button>
@@ -3875,6 +3884,7 @@ function showWarriorPickModal(candidates) {
     const cls = CLASSES[cand.classKey];
     const allSkills = SKILLS[cand.classKey] || [];
     const passive = CLASS_PASSIVES[cand.classKey];
+    const isEpic = isCandEpic(cand);
 
     // 所持スキル一覧(コンパクト)
     const skillsHTML = cand.ownedSkills.map(sIdx => {
@@ -3887,24 +3897,25 @@ function showWarriorPickModal(candidates) {
       ? `<div style="font-size: 8px; color: #88ddff; margin-top: 2px; line-height: 1.2;">⭐ ${passive.name}</div>`
       : '';
 
-    const rareTag = cand.isRare
-      ? `<div style="background: linear-gradient(90deg, #d4a020, #ffe080); color: #000; padding: 0 4px; border-radius: 2px; font-size: 8px; font-weight: bold; display: inline-block; margin-left: 3px;">★R</div>`
+    const rareTag = isEpic
+      ? `<div style="background: #ff3399; color: #fff; padding: 0 4px; border-radius: 2px; font-size: 8px; font-weight: bold; display: inline-block; margin-left: 3px;">★EPIC</div>`
       : '';
 
     const card = document.createElement('div');
-    card.className = 'reward-card' + (cand.isRare ? ' rare-warrior-card' : '');
-    card.style.cssText = 'padding: 6px; flex-direction: column; align-items: stretch; min-width: 0;';
+    card.className = 'reward-card' + (isEpic ? ' rare-warrior-card' : '');
+    card.style.cssText = 'padding: 6px; flex-direction: column; align-items: stretch; min-width: 0;'
+      + (isEpic ? ' border: 2px solid #ff3399; box-shadow: 0 0 12px rgba(255,51,153,0.6);' : '');
     card.innerHTML = `
       <div style="display: flex; gap: 6px; align-items: center;">
-        <div style="width: 40px; height: 40px; background: rgba(0,0,0,0.3); border: 1px solid ${cand.isRare ? '#d4a020' : '#5a4a30'}; flex-shrink: 0;">
+        <div style="width: 40px; height: 40px; background: rgba(0,0,0,0.3); border: 1px solid ${isEpic ? '#ff3399' : '#5a4a30'}; flex-shrink: 0;">
           <img src="data:image/png;base64,${SPRITES[cand.classKey]}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">
         </div>
         <div style="flex: 1; text-align: left; min-width: 0;">
-          <div style="font-size: 10px; color: #e8d8b8; line-height: 1.1;">
+          <div style="font-size: 10px; color: ${isEpic ? '#ff66bb' : '#e8d8b8'}; line-height: 1.1;">
             ${cand.charName || cls.name_ja}${rareTag}
           </div>
-          <div style="font-size: 8px; color: #a8956e; line-height: 1.2;">${cls.name_ja} <span style="color:#d4a020;">Lv${cand.level}</span></div>
-          <div style="font-size: 8px; color: #d4c5a9; line-height: 1.2;">HP${cand.maxHP} / SP<span style="color:#d4a020;">${cand.skillPoints}</span></div>
+          <div style="font-size: 8px; color: #a8956e; line-height: 1.2;">${cls.name_ja} <span style="color:${isEpic ? '#ff3399' : '#d4a020'};">Lv${cand.level}</span></div>
+          <div style="font-size: 8px; color: #d4c5a9; line-height: 1.2;">HP${cand.maxHP} / SP<span style="color:${isEpic ? '#ff3399' : '#d4a020'};">${cand.skillPoints}</span></div>
         </div>
       </div>
       <div style="margin-top: 4px; padding-top: 3px; border-top: 1px solid #3a2e1e; text-align: left;">
