@@ -144,8 +144,11 @@ function renderMap() {
   // ★Step1: 鍵カウンタの更新(画像src+所持数)
   updateKeyCounters();
 
+  // ★Phase3 v4: ノードと装飾は viewport 内に描画(パン/ズーム対象)
+  const nodeContainer = document.getElementById('map-viewport') || mapArea;
+  
   // 既存のノードを削除(SVGは残す)
-  mapArea.querySelectorAll('.map-node').forEach(n => n.remove());
+  nodeContainer.querySelectorAll('.map-node').forEach(n => n.remove());
 
   // ノード描画
   Object.values(MISSIONS).forEach(m => {
@@ -214,7 +217,7 @@ function renderMap() {
       // ★Phase3 v2: シングルタップで名前トースト、ダブルタップで遷移
       attachNodeTapHandler(node, m, needsKey);
     }
-    mapArea.appendChild(node);
+    nodeContainer.appendChild(node);
   });
 
   // ★Phase3: ゲート/ショップなどの装飾ノード描画
@@ -228,11 +231,20 @@ function renderMap() {
 // シングルタップ: ラベル(エリア名)をトースト表示
 // ダブルタップ : 戦闘画面/サブミッション選択画面へ遷移
 // 鍵不足/未実装の場合はシングルタップで即警告(ダブル不要)
+// ★Phase3 v4: パン/ピンチ後のクリック抑制を追加
 function attachNodeTapHandler(node, mission, needsKey) {
   let tapTimer = null;
   const TAP_DELAY = 280; // ms
   
   node.onclick = (e) => {
+    // ★ジェスチャー直後ならクリック無効
+    const viewport = document.getElementById('map-viewport');
+    if (viewport && viewport._suppressClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    
     e.preventDefault();
     e.stopPropagation();
     
@@ -274,8 +286,7 @@ function showNodeNameToast(mission) {
 
 // ★Phase3 v2: マップを画面いっぱいに拡大(上下ヘッダー以外全部マップ)
 // ★Phase3 v3: バグ修正 - displayを直接いじらず、画面切り替え(.active class)を邪魔しない
-// CSSで .screen { display: none } .screen.active { display: flex } 等の切り替えを尊重するため、
-// displayプロパティはCSS任せにして、レイアウト系プロパティだけ個別設定する
+// ★Phase3 v4: パン/ピンチズーム対応 - viewport ラッパーを作って transform で操作
 function applyFullscreenMapLayout() {
   const screen = document.getElementById('screen-map');
   const topBar = screen ? screen.querySelector('.map-top-bar') : null;
@@ -283,15 +294,11 @@ function applyFullscreenMapLayout() {
   const mapHint = document.getElementById('map-hint');
 
   if (screen) {
-    // displayはCSSに任せる。レイアウト系プロパティだけ個別設定
     screen.style.flexDirection = 'column';
     screen.style.height = '100dvh';
     screen.style.padding = '0';
     screen.style.margin = '0';
     screen.style.boxSizing = 'border-box';
-    // CSSで display:none/block の切り替えがあっても、display:flex 強制をやめる
-    // → CSSの .screen.active { display: flex } を期待する
-    // 万が一 CSS側が display:block の場合のフォールバック: activeのときだけflexを足す
     if (screen.classList.contains('active')) {
       screen.style.display = 'flex';
     }
@@ -304,19 +311,238 @@ function applyFullscreenMapLayout() {
     mapArea.style.height = 'auto';
     mapArea.style.minHeight = '0';
     mapArea.style.width = '100%';
-    mapArea.style.backgroundSize = 'cover';
-    mapArea.style.backgroundPosition = 'center';
-    mapArea.style.backgroundRepeat = 'no-repeat';
     mapArea.style.position = 'relative';
     mapArea.style.overflow = 'hidden';
+    // 背景画像はviewport側に移すのでクリア
+    mapArea.style.backgroundImage = 'none';
+    // タッチイベント時のブラウザ挙動を抑制(ピンチズームの誤発動防止)
+    mapArea.style.touchAction = 'none';
+
+    // ★viewport ラッパーを作る(まだなければ)
+    ensureMapViewport(mapArea);
   }
   if (mapHint) {
     mapHint.style.flex = '0 0 auto';
     mapHint.style.fontSize = '10px';
     mapHint.style.padding = '4px 8px';
     mapHint.style.lineHeight = '1.2';
-    mapHint.textContent = '▶ シングルタップ=名前 / ダブルタップ=開く';
+    mapHint.textContent = '▶ 1本指でスワイプ / 2本指でピンチ / シングルタップ=名前 / ダブルタップ=開く';
   }
+}
+
+// ★Phase3 v4: map-viewport ラッパーを作って既存のmap-area子要素を全部その中に移す
+// 1度だけ作る(idempotent)
+function ensureMapViewport(mapArea) {
+  let viewport = document.getElementById('map-viewport');
+  if (viewport) {
+    // すでに存在 → サイズ・スタイルだけ最新化
+    applyViewportStyles(viewport, mapArea);
+    return viewport;
+  }
+
+  // まだ無い → 新規作成
+  viewport = document.createElement('div');
+  viewport.id = 'map-viewport';
+  applyViewportStyles(viewport, mapArea);
+
+  // 既存の子要素(SVG, .map-node, .map-deco など)を viewport に移動
+  while (mapArea.firstChild) {
+    viewport.appendChild(mapArea.firstChild);
+  }
+  mapArea.appendChild(viewport);
+
+  // ジェスチャーハンドラを mapArea に登録(touch + wheel)
+  attachMapGestureHandlers(mapArea, viewport);
+
+  return viewport;
+}
+
+function applyViewportStyles(viewport, mapArea) {
+  // viewport は固定アスペクト比のマップを内部に描画する。サイズは map-area より大きくしてOK
+  // ここでは mapArea のサイズを基準にして、初期は等倍で全体表示。後でtransformで拡大縮小する。
+  const rect = mapArea.getBoundingClientRect();
+  const W = Math.max(rect.width, 1);
+  const H = Math.max(rect.height, 1);
+  viewport.style.position = 'absolute';
+  viewport.style.left = '0';
+  viewport.style.top = '0';
+  viewport.style.width = W + 'px';
+  viewport.style.height = H + 'px';
+  viewport.style.transformOrigin = '0 0';
+  viewport.style.willChange = 'transform';
+  // 背景画像を viewport に設定
+  if (typeof SPRITES !== 'undefined' && SPRITES.act1_map) {
+    viewport.style.backgroundImage = `url(data:image/jpeg;base64,${SPRITES.act1_map})`;
+    viewport.style.backgroundSize = '100% 100%';
+    viewport.style.backgroundPosition = 'center';
+    viewport.style.backgroundRepeat = 'no-repeat';
+  }
+}
+
+// ★Phase3 v4: マップのパン/ピンチジェスチャー処理
+// state は viewport に持たせる(_panX, _panY, _scale)
+function attachMapGestureHandlers(mapArea, viewport) {
+  // 状態は viewport の dataset に保存
+  let panX = 0, panY = 0, scale = 1;
+  const MIN_SCALE = 0.6;
+  const MAX_SCALE = 2.5;
+  
+  function applyTransform() {
+    viewport.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    viewport._panX = panX;
+    viewport._panY = panY;
+    viewport._scale = scale;
+  }
+  // 初期化
+  viewport._panX = 0;
+  viewport._panY = 0;
+  viewport._scale = 1;
+  
+  // ジェスチャー判定用変数
+  let activeTouches = [];   // 現在の指の座標 [{id, x, y}]
+  let gestureMode = null;   // 'pan' | 'pinch' | null
+  let panStartX = 0, panStartY = 0;        // タッチ開始時のパン値
+  let pinchStartDist = 0;                   // ピンチ開始時の指間距離
+  let pinchStartScale = 1;                  // ピンチ開始時のスケール
+  let pinchCenterX = 0, pinchCenterY = 0;   // ピンチ中心(map-area座標系)
+  let pinchStartPanX = 0, pinchStartPanY = 0;
+  let totalMoveDist = 0;                    // 累積移動距離(タップ判定用)
+  
+  function getMapAreaPoint(clientX, clientY) {
+    const r = mapArea.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
+  }
+  
+  function clampPan() {
+    // viewport の表示サイズ(scale適用後)
+    const r = mapArea.getBoundingClientRect();
+    const W = r.width, H = r.height;
+    const vw = parseFloat(viewport.style.width) * scale;
+    const vh = parseFloat(viewport.style.height) * scale;
+    // 画面に対してマップが小さい場合は中央寄せ、大きい場合は端で止める
+    const minX = Math.min(0, W - vw);
+    const maxX = Math.max(0, W - vw);
+    const minY = Math.min(0, H - vh);
+    const maxY = Math.max(0, H - vh);
+    panX = Math.min(maxX, Math.max(minX, panX));
+    panY = Math.min(maxY, Math.max(minY, panY));
+  }
+  
+  // ====== TOUCH ======
+  mapArea.addEventListener('touchstart', (e) => {
+    // 既存のタッチを更新
+    activeTouches = Array.from(e.touches).map(t => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY,
+    }));
+    totalMoveDist = 0;
+    
+    if (activeTouches.length === 1) {
+      gestureMode = 'pan';
+      panStartX = panX;
+      panStartY = panY;
+    } else if (activeTouches.length >= 2) {
+      gestureMode = 'pinch';
+      const [a, b] = activeTouches;
+      pinchStartDist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      pinchStartScale = scale;
+      pinchStartPanX = panX;
+      pinchStartPanY = panY;
+      const mid = getMapAreaPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+      pinchCenterX = mid.x;
+      pinchCenterY = mid.y;
+    }
+  }, { passive: true });
+  
+  mapArea.addEventListener('touchmove', (e) => {
+    // ブラウザのデフォルトピンチを抑止
+    if (e.touches.length >= 2) e.preventDefault();
+    
+    const newTouches = Array.from(e.touches).map(t => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY,
+    }));
+    
+    if (gestureMode === 'pan' && newTouches.length === 1 && activeTouches.length === 1) {
+      const dx = newTouches[0].x - activeTouches[0].x;
+      const dy = newTouches[0].y - activeTouches[0].y;
+      // 開始位置からの累計差分でpan更新(ドラッグ中の合計距離)
+      totalMoveDist = Math.hypot(dx, dy);  // 開始からの距離
+      panX = panStartX + dx;
+      panY = panStartY + dy;
+      clampPan();
+      applyTransform();
+    } else if (gestureMode === 'pinch' && newTouches.length >= 2) {
+      const [a, b] = newTouches;
+      const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      let newScale = pinchStartScale * (dist / pinchStartDist);
+      newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
+      // ピンチ中心がマップ上で固定されるようにpanも調整
+      // 中心点(mapArea座標系)に対して、scaleが変わる前後で同じマップ位置を保つ
+      // 旧: mapPos = (centerX - panX) / oldScale
+      // 新: mapPos = (centerX - newPanX) / newScale  → 同じ値にする
+      // → newPanX = centerX - mapPos * newScale = centerX - ((centerX - pinchStartPanX) / pinchStartScale) * newScale
+      panX = pinchCenterX - ((pinchCenterX - pinchStartPanX) / pinchStartScale) * newScale;
+      panY = pinchCenterY - ((pinchCenterY - pinchStartPanY) / pinchStartScale) * newScale;
+      scale = newScale;
+      clampPan();
+      applyTransform();
+      totalMoveDist += 10;  // ピンチ中はタップ判定を必ず無効に
+    }
+  }, { passive: false });
+  
+  mapArea.addEventListener('touchend', (e) => {
+    activeTouches = Array.from(e.touches).map(t => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY,
+    }));
+    if (activeTouches.length === 0) {
+      gestureMode = null;
+    } else if (activeTouches.length === 1) {
+      // ピンチ→1本指に戻った場合、パンに切り替え
+      gestureMode = 'pan';
+      panStartX = panX;
+      panStartY = panY;
+    }
+  }, { passive: true });
+  
+  mapArea.addEventListener('touchcancel', () => {
+    activeTouches = [];
+    gestureMode = null;
+  }, { passive: true });
+  
+  // ====== タップ判定: 累積移動距離が小さければ子要素のクリックを通す ======
+  // touchstart時点でtotalMoveDistをリセットしてるので、touchendまでに10px超えてればドラッグ扱い
+  // ノード/装飾のonclickハンドラに対して、ドラッグ後はクリックを抑制する処理を入れる
+  // → 現状の onclick の冒頭で「直前にドラッグしたかどうか」を判定したい
+  // viewport._lastWasGesture フラグで判定
+  mapArea.addEventListener('touchend', () => {
+    // タイミング: touchend で「ドラッグ扱いか」を viewport._suppressClick に格納
+    viewport._suppressClick = (totalMoveDist > 10);
+    if (viewport._suppressClick) {
+      // 短時間 _suppressClick=true にしてから false に戻す
+      setTimeout(() => { viewport._suppressClick = false; }, 100);
+    }
+  }, { passive: true });
+  
+  // ====== WHEEL (PC) ======
+  mapArea.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+    const pt = getMapAreaPoint(e.clientX, e.clientY);
+    panX = pt.x - ((pt.x - panX) / scale) * newScale;
+    panY = pt.y - ((pt.y - panY) / scale) * newScale;
+    scale = newScale;
+    clampPan();
+    applyTransform();
+  }, { passive: false });
+  
+  // 初期表示
+  applyTransform();
 }
 
 // ★Phase3 v3: 画面切り替え時に screen-map の display を毎回正しくセット
@@ -355,13 +581,17 @@ function applyFullscreenMapLayout() {
 // ★Phase3: ゲート(GOLD/BLUE)とショップを視覚表示として描画
 // MAP_DECORATIONSはdata_game.jsで定義。ロジックには関与せず純粋な装飾。
 // ★Phase3 v2: ラベルは通常非表示、シングルタップで名前トースト
+// ★Phase3 v4: viewport内に追加(パン/ズーム対象に)
 function renderMapDecorations() {
   const mapArea = document.getElementById('map-area');
   if (!mapArea) return;
   if (typeof MAP_DECORATIONS === 'undefined') return;
 
+  // viewport があればそちらに追加。無ければ mapArea 直下(後方互換)
+  const container = document.getElementById('map-viewport') || mapArea;
+
   // 既存の装飾ノードを削除
-  mapArea.querySelectorAll('.map-deco').forEach(n => n.remove());
+  container.querySelectorAll('.map-deco').forEach(n => n.remove());
 
   // 共通スタイル(マーカー本体)
   const baseNodeStyle = 'position:absolute;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:auto;cursor:pointer;user-select:none;';
@@ -379,13 +609,15 @@ function renderMapDecorations() {
     node.innerHTML = `
       <div style="width:22px;height:22px;background:${bgColor};border:2px solid ${borderColor};border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:${textColor};box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">🔒</div>
     `;
-    // タップで名前トースト
     node.onclick = (e) => {
+      // ジェスチャー直後ならクリック無効
+      const vp = document.getElementById('map-viewport');
+      if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
       e.preventDefault(); e.stopPropagation();
       const msg = `🔒 ${g.name} (${g.type.toUpperCase()} KEY 必要)`;
       if (typeof addLogEquipToast === 'function') addLogEquipToast(msg);
     };
-    mapArea.appendChild(node);
+    container.appendChild(node);
   });
 
   // ショップ描画
@@ -398,10 +630,12 @@ function renderMapDecorations() {
       <div style="width:22px;height:22px;background:linear-gradient(180deg,#88ee88 0%,#228822 100%);border:2px solid #c0ffc0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">$</div>
     `;
     node.onclick = (e) => {
+      const vp = document.getElementById('map-viewport');
+      if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
       e.preventDefault(); e.stopPropagation();
       onShopNodeClick(s);
     };
-    mapArea.appendChild(node);
+    container.appendChild(node);
   });
 }
 
@@ -429,13 +663,22 @@ function renderMapEdges() {
   if (!svg) return;
   svg.innerHTML = '';
 
-  const mapArea = document.getElementById('map-area');
-  const rect = mapArea.getBoundingClientRect();
+  // ★Phase3 v4: viewport基準でサイズ計算(viewport内にSVGがあるため)
+  const viewport = document.getElementById('map-viewport');
+  const refEl = viewport || document.getElementById('map-area');
+  const rect = refEl.getBoundingClientRect();
   const w = rect.width;
   const h = rect.height;
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.setAttribute('width', w);
   svg.setAttribute('height', h);
+  // viewportの中で全面に被せる
+  svg.style.position = 'absolute';
+  svg.style.left = '0';
+  svg.style.top = '0';
+  svg.style.width = '100%';
+  svg.style.height = '100%';
+  svg.style.pointerEvents = 'none';
 
   Object.values(MISSIONS).forEach(m => {
     m.unlocks.forEach(targetId => {
@@ -455,13 +698,16 @@ function renderMapEdges() {
         line.classList.add('available');
       }
 
-      // ★Phase3 v3: 黄色点線(原作Tactical Warrior風) - 本筋ルート(GOLD)を点線化
-      // インラインstyleで上書き(CSSの設定があってもこちらが優先)
-      line.setAttribute('stroke', '#ffc940');
-      line.setAttribute('stroke-width', '3');
-      line.setAttribute('stroke-dasharray', '8 6');  // 8px線、6px隙間
-      line.setAttribute('stroke-linecap', 'round');
-      line.setAttribute('opacity', '0.85');
+      // ★Phase3 v4: 黄色点線(原作Tactical Warrior風)
+      // CSSの !important対策で style属性に !important を付ける
+      line.setAttribute('style',
+        'stroke:#ffc940 !important;' +
+        'stroke-width:3 !important;' +
+        'stroke-dasharray:8 6 !important;' +
+        'stroke-linecap:round !important;' +
+        'opacity:0.85 !important;' +
+        'fill:none !important;'
+      );
 
       svg.appendChild(line);
     });
