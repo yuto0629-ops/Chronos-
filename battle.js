@@ -3118,6 +3118,17 @@ function calculateExpGain(mission, allyUnits) {
     return Math.max(0.04, 0.60 - (diff - 3) * 0.12);
   }
 
+  // ★B-4 (原作仕様): 生存ボーナスは総額固定×生存者で分配
+  // 「生存者人数が多くても総量は変わらない」「効率よく稼ぐには死なないこと」
+  // バトル難度に応じてプール額を決める(雑魚バトル 60、強敵バトル up to 200)
+  const survivalPool = 60 + enemyTotalLv * 8;  // 例: 敵総Lv5で 100、Lv10で 140
+  const aliveAllies = allyUnits.filter(u => !u.dead && !u.isPet);
+  const survivors = aliveAllies.length;
+  // HP=1 は半分の枠扱いにする(生き残ったが瀕死ペナルティ)
+  const aliveWeights = aliveAllies.map(u => u.hp <= 1 ? 0.5 : 1.0);
+  const totalWeight = aliveWeights.reduce((a, b) => a + b, 0);
+  const survivalPerWeight = totalWeight > 0 ? survivalPool / totalWeight : 0;
+
   // ③ 生存ボーナス + キャップ補正
   const perChar = {};
   state.partyData.forEach((pd, idx) => {
@@ -3129,13 +3140,10 @@ function calculateExpGain(mission, allyUnits) {
       const killBonus = killCredits[ally.id] || 0;
       exp += killBonus;
 
-      // 生存ボーナス
+      // 生存ボーナス(原作: 総額固定×生存者で分配)
       if (!ally.dead) {
-        if (ally.hp <= 1) {
-          exp += 20;  // HP=1: 半額
-        } else {
-          exp += 40;  // 通常生存
-        }
+        const weight = ally.hp <= 1 ? 0.5 : 1.0;
+        exp += Math.floor(survivalPerWeight * weight);
       }
       // 死亡: 出撃ボーナスのみ(=baseBonus単独)
     }
@@ -3147,7 +3155,7 @@ function calculateExpGain(mission, allyUnits) {
     perChar[idx] = exp;
   });
 
-  return { perChar, baseBonus, levelCap };
+  return { perChar, baseBonus, levelCap, survivalPool };
 }
 
 // ====== ミッション敗北処理 ======
