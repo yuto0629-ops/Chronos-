@@ -137,6 +137,10 @@ function renderMap() {
     mapArea.style.backgroundImage = `url(data:image/jpeg;base64,${SPRITES.act1_map})`;
   }
 
+  // ★Phase3 v2: マップを画面いっぱいに拡大(上下ヘッダー以外全部マップ)
+  // CSSで .map-area の高さが固定されてても、インラインstyleで上書き
+  applyFullscreenMapLayout();
+
   // ★Step1: 鍵カウンタの更新(画像src+所持数)
   updateKeyCounters();
 
@@ -203,19 +207,12 @@ function renderMap() {
       <div class="map-node-circle ${circleClass}">${icon}</div>
       ${badge}
       ${keyReqBadge}
-      <div class="map-node-label">${m.name_ja}</div>
+      <div class="map-node-label" style="display:none;">${m.name_ja}</div>
     `;
 
     if (clickable) {
-      if (needsKey) {
-        // ★Step4: 鍵不足時はクリックで警告
-        node.onclick = () => onKeyLockedNodeClick(m, needsKey);
-      } else if (m.notImplemented) {
-        // ★Phase3: 中身未実装エリアのクリック (Training/Dueling/Crag)
-        node.onclick = () => onNotImplementedNodeClick(m);
-      } else {
-        node.onclick = () => enterBattle(m.id);
-      }
+      // ★Phase3 v2: シングルタップで名前トースト、ダブルタップで遷移
+      attachNodeTapHandler(node, m, needsKey);
     }
     mapArea.appendChild(node);
   });
@@ -227,9 +224,82 @@ function renderMap() {
   requestAnimationFrame(() => renderMapEdges());
 }
 
+// ★Phase3 v2: ノードタップ処理
+// シングルタップ: ラベル(エリア名)をトースト表示
+// ダブルタップ : 戦闘画面/サブミッション選択画面へ遷移
+// 鍵不足/未実装の場合はシングルタップで即警告(ダブル不要)
+function attachNodeTapHandler(node, mission, needsKey) {
+  let tapTimer = null;
+  const TAP_DELAY = 280; // ms
+  
+  node.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 鍵不足/未実装は即警告(ダブルタップ判定不要)
+    if (needsKey) {
+      onKeyLockedNodeClick(mission, needsKey);
+      return;
+    }
+    if (mission.notImplemented) {
+      onNotImplementedNodeClick(mission);
+      return;
+    }
+    
+    // 通常エリア: シングル/ダブル判定
+    if (tapTimer) {
+      // ダブルタップ確定
+      clearTimeout(tapTimer);
+      tapTimer = null;
+      enterBattle(mission.id);
+    } else {
+      // シングルタップ仮確定 → TAP_DELAY ms 後に確定
+      tapTimer = setTimeout(() => {
+        tapTimer = null;
+        showNodeNameToast(mission);
+      }, TAP_DELAY);
+    }
+  };
+}
+
+// ★Phase3 v2: ノード名のトースト表示(シングルタップ時)
+function showNodeNameToast(mission) {
+  const msg = `${mission.name_ja} ${mission.name ? '(' + mission.name + ')' : ''}\nもう一度タップで開く`;
+  if (typeof addLogEquipToast === 'function') {
+    addLogEquipToast(msg);
+  } else {
+    console.log(msg);
+  }
+}
+
+// ★Phase3 v2: マップを画面いっぱいに拡大(上下ヘッダー以外全部マップ)
+// CSSで .map-area の高さが固定されてても、インラインstyleで強制上書き
+function applyFullscreenMapLayout() {
+  const screen = document.getElementById('screen-map');
+  const topBar = screen ? screen.querySelector('.map-top-bar') : null;
+  const mapArea = document.getElementById('map-area');
+  const mapHint = document.getElementById('map-hint');
+
+  if (screen) {
+    // 画面全体をflex縦並びにする
+    screen.style.cssText += ';display:flex;flex-direction:column;height:100vh;height:100dvh;padding:0;margin:0;box-sizing:border-box;';
+  }
+  if (topBar) {
+    topBar.style.cssText += ';flex:0 0 auto;';
+  }
+  if (mapArea) {
+    // マップは残り全部使う
+    mapArea.style.cssText += ';flex:1 1 auto;height:auto;min-height:0;width:100%;background-size:cover;background-position:center;background-repeat:no-repeat;position:relative;overflow:hidden;';
+  }
+  if (mapHint) {
+    mapHint.style.cssText += ';flex:0 0 auto;font-size:10px;padding:4px 8px;line-height:1.2;';
+    mapHint.textContent = '▶ シングルタップ=名前 / ダブルタップ=開く';
+  }
+}
+
 // ★Phase3: ゲート(GOLD/BLUE)とショップを視覚表示として描画
 // MAP_DECORATIONSはdata_game.jsで定義。ロジックには関与せず純粋な装飾。
-// インラインstyleで完結(style.css不要、追加CSS書かずに動く)
+// ★Phase3 v2: ラベルは通常非表示、シングルタップで名前トースト
 function renderMapDecorations() {
   const mapArea = document.getElementById('map-area');
   if (!mapArea) return;
@@ -239,8 +309,7 @@ function renderMapDecorations() {
   mapArea.querySelectorAll('.map-deco').forEach(n => n.remove());
 
   // 共通スタイル(マーカー本体)
-  const baseNodeStyle = 'position:absolute;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:auto;cursor:default;user-select:none;';
-  const baseLabelStyle = 'margin-top:2px;background:rgba(0,0,0,0.85);color:#fff;padding:1px 5px;border-radius:3px;font-size:8px;line-height:1.2;font-weight:700;white-space:nowrap;border:1px solid rgba(255,255,255,0.25);display:inline-block;';
+  const baseNodeStyle = 'position:absolute;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:auto;cursor:pointer;user-select:none;';
 
   // ゲート描画
   (MAP_DECORATIONS.gates || []).forEach(g => {
@@ -254,8 +323,13 @@ function renderMapDecorations() {
     node.title = `${g.name} (${g.type.toUpperCase()} KEY)`;
     node.innerHTML = `
       <div style="width:22px;height:22px;background:${bgColor};border:2px solid ${borderColor};border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:${textColor};box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">🔒</div>
-      <div style="${baseLabelStyle}">${g.name}</div>
     `;
+    // タップで名前トースト
+    node.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const msg = `🔒 ${g.name} (${g.type.toUpperCase()} KEY 必要)`;
+      if (typeof addLogEquipToast === 'function') addLogEquipToast(msg);
+    };
     mapArea.appendChild(node);
   });
 
@@ -263,13 +337,15 @@ function renderMapDecorations() {
   (MAP_DECORATIONS.shops || []).forEach(s => {
     const node = document.createElement('div');
     node.className = 'map-deco map-deco-shop';
-    node.style.cssText = baseNodeStyle + `left:${s.x}%;top:${s.y}%;cursor:pointer;`;
+    node.style.cssText = baseNodeStyle + `left:${s.x}%;top:${s.y}%;`;
     node.title = s.name;
     node.innerHTML = `
       <div style="width:22px;height:22px;background:linear-gradient(180deg,#88ee88 0%,#228822 100%);border:2px solid #c0ffc0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">$</div>
-      <div style="${baseLabelStyle}background:rgba(0,40,0,0.9);">${s.name}</div>
     `;
-    node.onclick = () => onShopNodeClick(s);
+    node.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      onShopNodeClick(s);
+    };
     mapArea.appendChild(node);
   });
 }

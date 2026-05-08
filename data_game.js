@@ -277,7 +277,7 @@ const MISSIONS = {
     id: 'trivial_plain',
     name: 'The Trivial Plain',
     name_ja: '平原の小手調べ',
-    x: 88, y: 67,  // ★Phase3: 元(96.3,67.6)から見切れ防止で内側に
+    x: 87, y: 58,  // ★Phase3: 元(96.3,67.6)から見切れ防止で内側に
     enemies: [
       { classKey: 'coyote', x: 17, y: 3, level: 1 },
       { classKey: 'coyote', x: 18, y: 5, level: 1 },
@@ -308,7 +308,7 @@ const MISSIONS = {
     id: 'forest_edge',
     name: "The Forest's Edge",
     name_ja: '森の縁',
-    x: 72.7, y: 56.4,
+    x: 72, y: 50,
     enemies: [
       { classKey: 'coyote', x: 16, y: 2, level: 2 },
       { classKey: 'coyote', x: 18, y: 4, level: 2 },
@@ -386,7 +386,7 @@ const MISSIONS = {
     id: 'glade',
     name: 'The Glade',
     name_ja: '林の空き地',
-    x: 59.3, y: 64.0,
+    x: 28, y: 53,
     enemies: [
       { classKey: 'badger', x: 16, y: 3, level: 2 },
       { classKey: 'badger', x: 18, y: 5, level: 2 },
@@ -467,7 +467,7 @@ const MISSIONS = {
     id: 'academy',
     name: 'The Academy',
     name_ja: 'アカデミー',
-    x: 40.0, y: 50.0,
+    x: 52, y: 50,
     enemies: [
       { classKey: 'serpent', x: 16, y: 3, level: 3 },
       { classKey: 'badger', x: 18, y: 5, level: 3 },
@@ -483,7 +483,7 @@ const MISSIONS = {
     id: 'village',
     name: 'The Village',
     name_ja: '村',
-    x: 67.8, y: 46.1,
+    x: 45, y: 45,
     enemies: [
       { classKey: 'monk', x: 16, y: 3, level: 2 },
       { classKey: 'gladiator', x: 18, y: 5, level: 2 },
@@ -499,7 +499,7 @@ const MISSIONS = {
     id: 'tournament',
     name: 'The Tournament',
     name_ja: '武闘大会',
-    x: 32.2, y: 19.8,
+    x: 28, y: 13,
     enemies: [
       { classKey: 'champion', x: 17, y: 3, level: 3, rank: 'elite' },
       { classKey: 'knight', x: 18, y: 5, level: 3, rank: 'elite' },
@@ -516,7 +516,7 @@ const MISSIONS = {
     id: 'bear_cave',
     name: 'Bear Cave',
     name_ja: '熊の洞窟',
-    x: 13.0, y: 22.0,
+    x: 13, y: 25,
     enemies: [
       { classKey: 'bandit_boss', x: 17, y: 5, level: 4 },
     ],
@@ -532,7 +532,7 @@ const MISSIONS = {
     id: 'sandy_shore',
     name: 'Sandy Shore',
     name_ja: '砂浜',
-    x: 10.7, y: 89.7,
+    x: 55, y: 18,
     enemies: [
       { classKey: 'alchemist', x: 16, y: 3, level: 3, rank: 'elite' },
       { classKey: 'serpent', x: 18, y: 5, level: 3 },
@@ -554,7 +554,7 @@ const MISSIONS = {
     id: 'the_crag',
     name: 'The Crag',
     name_ja: '岩山',
-    x: 46.7, y: 34.8,
+    x: 78, y: 13,
     enemies: [],
     unlocks: [],
     warriorReward: false,
@@ -566,7 +566,7 @@ const MISSIONS = {
     id: 'dueling_grounds',
     name: 'The Dueling Grounds',
     name_ja: '決闘場',
-    x: 57.1, y: 25.0,
+    x: 33, y: 30,
     enemies: [],
     unlocks: ['the_crag'],
     warriorReward: false,
@@ -578,7 +578,7 @@ const MISSIONS = {
     id: 'training_grounds',
     name: 'Training Grounds',
     name_ja: '訓練場',
-    x: 8.1, y: 46.1,  // ★スクショで読み取った正確な値
+    x: 8, y: 78,  // ★スクショで読み取った正確な値
     enemies: [],
     unlocks: [],
     warriorReward: false,
@@ -587,28 +587,28 @@ const MISSIONS = {
   },
 };
 
-// ★Phase3: マップ装飾要素 (ゲート・ショップ) - 視覚表示のみ
-// ロジックには関与しない。MISSIONSとは独立した描画用データ。
+// ★Phase3 v7: マップ装飾要素 (ゲート・ショップ) - 丸消し版マップ対応
 const MAP_DECORATIONS = {
   gates: [
-    // GOLDゲート (本筋ルートの障壁) - 視覚的にロックの存在を伝える
-    { id: 'gate_progress_1', name: 'Progress I',   type: 'gold', x: 23.3, y: 37.7 },
-    { id: 'gate_progress_2', name: 'Progress II',  type: 'gold', x: 36.8, y: 40.4 },
-    { id: 'gate_progress_3', name: 'Progress III', type: 'gold', x: 39.8, y: 86.2 },
+    // ★Phase3 v7: 丸消し版マップ + SHIBAさん指示の最終配置
+    // GOLDゲート (本筋ルートの障壁)
+    { id: 'gate_progress_1', name: 'Progress I',   type: 'gold', x: 60, y: 53 },  // Forest's Edge ⇄ Village
+    { id: 'gate_progress_2', name: 'Progress II',  type: 'gold', x: 38, y: 50 },  // Academy ⇄ Glade
+    { id: 'gate_progress_3', name: 'Progress III', type: 'gold', x: 28, y: 30 },  // Glade ⇄ Tournament
     // BLUEゲート (隠しエリアへの分岐)
-    { id: 'gate_bears',    name: 'Gate of Bears',    type: 'blue', x: 16.1, y: 45.6 },
-    { id: 'gate_training', name: 'Gate of Training', type: 'blue', x: 11.0, y: 66.4 },
-    { id: 'gate_sea',      name: 'Gate of Sea',      type: 'blue', x: 75.5, y: 42.4 },
-    { id: 'gate_duelist',  name: 'Gate of Duelist',  type: 'blue', x: 76.7, y: 84.0 },
-    { id: 'gate_crags',    name: 'Gate of Crags',    type: 'blue', x: 84.8, y: 60.0 },
+    { id: 'gate_bears',    name: 'Gate of Bears',    type: 'blue', x: 15, y: 14 },  // Tournament ⇄ Bear Cave
+    { id: 'gate_training', name: 'Gate of Training', type: 'blue', x: 25, y: 73 },  // Glade ⇄ 訓練場
+    { id: 'gate_sea',      name: 'Gate of Sea',      type: 'blue', x: 42, y: 22 },  // Tournament経路 ⇄ Sandy Shore
+    { id: 'gate_duelist',  name: 'Gate of Duelist',  type: 'blue', x: 33, y: 38 },  // Forest's Edge ⇄ Dueling
+    { id: 'gate_crags',    name: 'Gate of Crags',    type: 'blue', x: 70, y: 22 },  // Sandy Shore ⇄ The Crag
   ],
   shops: [
     // ショップ (購買所) - クリック時は「未実装」トースト
-    { id: 'shop_outpost',  name: 'The Outpost',           x: 31.1, y: 75.0 },
-    { id: 'shop_armory',   name: 'The Armory',            x: 75.0, y: 38.0 },  // ★微調整: Sea近く
-    { id: 'shop_village',  name: 'The Village Shop',      x: 53.0, y: 35.0 },  // ★微調整: Cragと重ならない位置
-    { id: 'shop_academy',  name: 'The Academy Shop',      x: 45.0, y: 56.0 },  // ★微調整: Academyの右下
-    { id: 'shop_lemuel',   name: "Lemuel's Knick Knacks", x: 20.0, y: 33.0 },  // ★微調整: Progress Iと重ならない
+    { id: 'shop_outpost',  name: 'The Outpost',           x: 40, y: 80 },  // ★中央下の池(SHIBA指示)
+    { id: 'shop_armory',   name: 'The Armory',            x: 35, y: 13 },  // Tournament隣
+    { id: 'shop_village',  name: 'The Village Shop',      x: 42, y: 39 },  // Village北
+    { id: 'shop_academy',  name: 'The Academy Shop',      x: 56, y: 53 },  // Academy右下
+    { id: 'shop_lemuel',   name: "Lemuel's Knick Knacks", x: 60, y: 22 },  // Sandy Shore近く
   ],
 };
 
