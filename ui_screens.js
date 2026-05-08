@@ -96,6 +96,21 @@ function renderMap() {
   if (!state.routeFlags) state.routeFlags = {};
   if (!state.clearedSubMissions) state.clearedSubMissions = [];
 
+  // ★Phase3 migration: 旧ID → 新ID 置換 (tavern→bear_cave, ruins→academy, temple→sandy_shore)
+  // 過去のセーブ状態でこれらのIDが残ってる場合に救済
+  const ID_RENAME = {
+    'tavern': 'bear_cave',
+    'ruins': 'academy',
+    'temple': 'sandy_shore',
+  };
+  state.available = state.available.map(id => ID_RENAME[id] || id);
+  state.cleared = state.cleared.map(id => ID_RENAME[id] || id);
+  // 重複排除
+  state.available = [...new Set(state.available)];
+  state.cleared = [...new Set(state.cleared)];
+  // available に既に cleared なIDが入ってたら除外
+  state.available = state.available.filter(id => !state.cleared.includes(id));
+
   // ★migration: 既存セーブで「サブミッション1つでもクリア済みなのにエリア未クリア」を救済
   // (旧仕様「全サブミッションクリアで初めてエリアクリア」のせいで詰んだ状態を解除)
   Object.values(MISSIONS).forEach(m => {
@@ -195,6 +210,9 @@ function renderMap() {
       if (needsKey) {
         // ★Step4: 鍵不足時はクリックで警告
         node.onclick = () => onKeyLockedNodeClick(m, needsKey);
+      } else if (m.notImplemented) {
+        // ★Phase3: 中身未実装エリアのクリック (Training/Dueling/Crag)
+        node.onclick = () => onNotImplementedNodeClick(m);
       } else {
         node.onclick = () => enterBattle(m.id);
       }
@@ -202,8 +220,76 @@ function renderMap() {
     mapArea.appendChild(node);
   });
 
+  // ★Phase3: ゲート/ショップなどの装飾ノード描画
+  renderMapDecorations();
+
   // エッジ(線)描画(layoutが確定してから)
   requestAnimationFrame(() => renderMapEdges());
+}
+
+// ★Phase3: ゲート(GOLD/BLUE)とショップを視覚表示として描画
+// MAP_DECORATIONSはdata_game.jsで定義。ロジックには関与せず純粋な装飾。
+// インラインstyleで完結(style.css不要、追加CSS書かずに動く)
+function renderMapDecorations() {
+  const mapArea = document.getElementById('map-area');
+  if (!mapArea) return;
+  if (typeof MAP_DECORATIONS === 'undefined') return;
+
+  // 既存の装飾ノードを削除
+  mapArea.querySelectorAll('.map-deco').forEach(n => n.remove());
+
+  // 共通スタイル(マーカー本体)
+  const baseNodeStyle = 'position:absolute;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:auto;cursor:default;user-select:none;';
+  const baseLabelStyle = 'margin-top:2px;background:rgba(0,0,0,0.85);color:#fff;padding:1px 5px;border-radius:3px;font-size:8px;line-height:1.2;font-weight:700;white-space:nowrap;border:1px solid rgba(255,255,255,0.25);display:inline-block;';
+
+  // ゲート描画
+  (MAP_DECORATIONS.gates || []).forEach(g => {
+    const node = document.createElement('div');
+    node.className = `map-deco map-deco-gate map-deco-gate-${g.type}`;
+    node.style.cssText = baseNodeStyle + `left:${g.x}%;top:${g.y}%;`;
+    const isGold = g.type === 'gold';
+    const bgColor = isGold ? 'linear-gradient(180deg,#ffe060 0%,#b88800 100%)' : 'linear-gradient(180deg,#6090ff 0%,#1840b8 100%)';
+    const borderColor = isGold ? '#fff8c0' : '#c0d8ff';
+    const textColor = isGold ? '#3a2200' : '#fff';
+    node.title = `${g.name} (${g.type.toUpperCase()} KEY)`;
+    node.innerHTML = `
+      <div style="width:22px;height:22px;background:${bgColor};border:2px solid ${borderColor};border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:${textColor};box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">🔒</div>
+      <div style="${baseLabelStyle}">${g.name}</div>
+    `;
+    mapArea.appendChild(node);
+  });
+
+  // ショップ描画
+  (MAP_DECORATIONS.shops || []).forEach(s => {
+    const node = document.createElement('div');
+    node.className = 'map-deco map-deco-shop';
+    node.style.cssText = baseNodeStyle + `left:${s.x}%;top:${s.y}%;cursor:pointer;`;
+    node.title = s.name;
+    node.innerHTML = `
+      <div style="width:22px;height:22px;background:linear-gradient(180deg,#88ee88 0%,#228822 100%);border:2px solid #c0ffc0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">$</div>
+      <div style="${baseLabelStyle}background:rgba(0,40,0,0.9);">${s.name}</div>
+    `;
+    node.onclick = () => onShopNodeClick(s);
+    mapArea.appendChild(node);
+  });
+}
+
+// ★Phase3: 未実装エリアのクリック警告
+function onNotImplementedNodeClick(mission) {
+  if (typeof addLogEquipToast === 'function') {
+    addLogEquipToast(`🚧 ${mission.name_ja} は次回以降のアップデートで実装予定`);
+  } else {
+    alert(`${mission.name_ja} は未実装です`);
+  }
+}
+
+// ★Phase3: ショップクリック (今は未実装トースト)
+function onShopNodeClick(shop) {
+  if (typeof addLogEquipToast === 'function') {
+    addLogEquipToast(`🏪 ${shop.name} (購買所は未実装)`);
+  } else {
+    alert(`${shop.name} は未実装です`);
+  }
 }
 
 // ====== マップのエッジ(接続線)描画 ======
