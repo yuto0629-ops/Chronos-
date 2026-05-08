@@ -637,6 +637,32 @@ function renderMapDecorations() {
     };
     container.appendChild(node);
   });
+
+  // ★Phase3 v8: イベントバトル描画 (マゼンタ青リング、中身は次回実装)
+  (MAP_DECORATIONS.events || []).forEach(ev => {
+    const node = document.createElement('div');
+    node.className = 'map-deco map-deco-event';
+    node.style.cssText = baseNodeStyle + `left:${ev.x}%;top:${ev.y}%;`;
+    node.title = ev.name_ja || ev.name;
+    // マゼンタ円(外)+ 黄色コイン(内) の二重表示
+    node.innerHTML = `
+      <div style="position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;">
+        <div style="position:absolute;width:32px;height:32px;border-radius:50%;background:radial-gradient(circle,rgba(255,80,200,0.8) 0%,rgba(255,80,200,0) 70%);"></div>
+        <div style="position:absolute;width:24px;height:24px;border-radius:50%;border:3px solid #2050ff;background:transparent;"></div>
+        <div style="position:relative;width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,#ffe060 0%,#b88800 100%);border:2px solid #fff8c0;box-shadow:0 0 0 1px rgba(0,0,0,0.4);"></div>
+      </div>
+    `;
+    node.onclick = (e) => {
+      const vp = document.getElementById('map-viewport');
+      if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
+      e.preventDefault(); e.stopPropagation();
+      const label = ev.name_ja || ev.name;
+      if (typeof addLogEquipToast === 'function') {
+        addLogEquipToast(`⚔️ ${label} は次回以降のアップデートで実装予定`);
+      }
+    };
+    container.appendChild(node);
+  });
 }
 
 // ★Phase3: 未実装エリアのクリック警告
