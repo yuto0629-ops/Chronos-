@@ -3079,13 +3079,17 @@ function onMissionVictory() {
 }
 
 // ====== EXP計算(原作仕様 7.1) ======
-// ★B-3,B-4: per-character分配
-// 戻り値: { perChar: {pdId: expValue}, totalDistributed: number }
+// ★B-3,B-4 + レベルキャップ補正
+// 戻り値: { perChar: {pdId: expValue}, totalDistributed: number, levelCap: number }
 function calculateExpGain(mission, allyUnits) {
   const partySize = state.partyData.length;
 
+  // ★レベルキャップ = そのバトルの最高敵Lv (原作仕様)
+  const enemyLevels = (mission.enemies || []).map(e => e.level || 1);
+  const levelCap = enemyLevels.length > 0 ? Math.max(...enemyLevels) : 1;
+
   // ① 出撃ボーナス: 全員一律
-  const enemyTotalLv = (mission.enemies || []).reduce((sum, e) => sum + (e.level || 1), 0);
+  const enemyTotalLv = enemyLevels.reduce((sum, lv) => sum + lv, 0);
   const baseBonus = 30 + enemyTotalLv * 15;
 
   // ② 撃破ボーナス: killedBy で本人のみ
@@ -3098,11 +3102,25 @@ function calculateExpGain(mission, allyUnits) {
     }
   });
 
-  // ③ 生存ボーナス: 生き残った人のみ40
-  // HP=1で生き残った人は半額(20)
+  // ★レベルキャップ補正(原作: 仕様書「レベルキャップによる経験値減少」)
+  // 自Lv ≤ レベルキャップ : 100%
+  // 自Lv = キャップ+1     : 84%
+  // 自Lv = キャップ+2     : 72%
+  // 自Lv = キャップ+3     : 60%
+  // 以下12%ずつ減 (最低 4%)
+  function levelCapMultiplier(charLv) {
+    const diff = charLv - levelCap;
+    if (diff <= 0) return 1.0;       // 同値以下 = 100%
+    if (diff === 1) return 0.84;     // +1 = 84%
+    if (diff === 2) return 0.72;     // +2 = 72%
+    if (diff === 3) return 0.60;     // +3 = 60%
+    // +4以降は12%ずつ減、最低 4%
+    return Math.max(0.04, 0.60 - (diff - 3) * 0.12);
+  }
+
+  // ③ 生存ボーナス + キャップ補正
   const perChar = {};
   state.partyData.forEach((pd, idx) => {
-    // partyDataにはpdIdが無いので、index基準で対応するallyUnitを探す
     const ally = allyUnits.find(u => u.classKey === pd.classKey && u.partyIdx === idx);
     let exp = baseBonus;
 
@@ -3122,10 +3140,14 @@ function calculateExpGain(mission, allyUnits) {
       // 死亡: 出撃ボーナスのみ(=baseBonus単独)
     }
 
+    // ★レベルキャップ補正を適用
+    const mult = levelCapMultiplier(pd.level);
+    exp = Math.floor(exp * mult);
+
     perChar[idx] = exp;
   });
 
-  return { perChar, baseBonus };
+  return { perChar, baseBonus, levelCap };
 }
 
 // ====== ミッション敗北処理 ======
