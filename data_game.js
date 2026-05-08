@@ -263,33 +263,38 @@ const SKILLS = {"monk": [{"name": "Bounding Kick", "name_ja": "弾けキック",
 const BASIC_ATTACKS = {"monk": {"name": "Bounding Kick", "name_ja": "弾けキック", "damage": 22, "type": "M", "range": 1, "cost": 10, "crit": 40}, "knight": {"name": "Critical Slash", "name_ja": "クリティカル斬", "damage": 24, "type": "M", "range": 1, "cost": 30, "crit": 40}, "healer": {"name": "Quick Shot", "name_ja": "速射", "damage": 18, "type": "R", "range": 3, "cost": 20, "crit": 30}, "gladiator": {"name": "Throwing Knives", "name_ja": "投げナイフ", "damage": 17, "type": "R", "range": 3, "cost": 15, "crit": 25}, "champion": {"name": "Slash", "name_ja": "斬撃", "damage": 20, "type": "M", "range": 1, "cost": 5, "crit": 40}, "barbarian": {"name": "Tackle", "name_ja": "タックル", "damage": 28, "type": "M", "range": 1, "cost": 30, "crit": 25}, "rocketeer": {"name": "Yellow Tiger", "name_ja": "イエロータイガー", "damage": 26, "type": "S", "range": 6, "cost": 35, "crit": 30}, "jungleman": {"name": "Javelin Sting", "name_ja": "ジャベリン", "damage": 22, "type": "R", "range": 3, "cost": 25, "crit": 30}, "archer": {"name": "Power Shot", "name_ja": "パワーショット", "damage": 28, "type": "R", "range": 4, "cost": 35, "crit": 50}, "alchemist": {"name": "Cane", "name_ja": "杖打ち", "damage": 19, "type": "M", "range": 1, "cost": 10, "crit": 30}, "beastmaster": {"name": "Immaterial Bash", "name_ja": "実体貫きの一撃", "damage": 30, "type": "M", "range": 2, "cost": 30, "crit": 35}, "ranger": {"name": "Arrow Spray", "name_ja": "アロースプレー", "damage": 7, "hits": 3, "type": "R", "range": 3, "cost": 15, "crit": 50}, "hound": {"name": "Maul", "name_ja": "噛みつき", "damage": 18, "type": "M", "range": 1, "cost": 10, "crit": 30}, "coyote": {"name": "Claw", "name_ja": "爪攻撃", "damage": 16, "type": "M", "range": 1, "cost": 15, "crit": 25}, "badger": {"name": "Badger Scratch", "name_ja": "アナグマ引っ掻き", "damage": 20, "type": "M", "range": 1, "cost": 25, "crit": 30}, "serpent": {"name": "Hiss", "name_ja": "シャー", "damage": 12, "type": "S", "range": 3, "cost": 15, "crit": 20}, "bandit_boss": {"name": "Tackle", "name_ja": "タックル", "damage": 32, "type": "M", "range": 1, "cost": 25, "crit": 30}};
 // ====== ミッション定義(ACT 1) ======
 const MISSIONS = {
-  // ========================================
-  // ACT 1: Woodland (原作準拠11エリア)
-  // ★Phase3 マップ反映: 既存3エリアをリネームして原作にマッピング
-  //   tavern → Bear Cave (隠しボス、BLUE鍵で開放)
-  //   ruins  → Academy   (本筋ルート、GOLD鍵で開放)
-  //   temple → Sandy Shore (隠しエリア、BLUE鍵で開放)
-  // ★新規追加3エリア (中身は次回以降、ノード表示+「未実装」トーストのみ)
-  //   Training Grounds / Dueling Grounds / The Crag
-  // ========================================
+  // ============================================
+  // ★Phase3 v8: SHIBA確定の最終配置 (右下START → 左中央GOAL)
+  //
+  // 本筋GOLDルート: S1→S2→S3→S4→S6(中ボス)→[GOLD門]→S10(ラスボス)
+  // BLUEルート分岐:
+  //   B1先 (左上方向): S8 岩山, S9 熊洞窟, E5 熊との遭遇, $4
+  //   B2先 (左下方向): S5 林の空き地, S11 訓練場, E2 ポーション, E3 山賊頭領, $2
+  //
+  // BLUE KEY: S2森の縁で1個 + S9熊洞窟/S11訓練場で各1個 (両ルート解放可能)
+  // GOLD KEY: S6武闘大会(中ボス)撃破で1個 → GOLD門開錠でS10へ
+  //
+  // ★今回はゲート/イベントのロジックは未実装(タップで「未実装」トースト)
+  // 既存MISSIONS.requiresKey は S10 dueling_grounds のみ(GOLD)、S8/S9/S11はBLUEを保持
+  // ============================================
 
   trivial_plain: {
     id: 'trivial_plain',
     name: 'The Trivial Plain',
-    name_ja: '平原の小手調べ',
-    x: 87, y: 58,  // ★Phase3: 元(96.3,67.6)から見切れ防止で内側に
+    name_ja: '平原',
+    x: 88.5, y: 61.5,  // ★S1: 右下START
     enemies: [
       { classKey: 'coyote', x: 17, y: 3, level: 1 },
       { classKey: 'coyote', x: 18, y: 5, level: 1 },
       { classKey: 'coyote', x: 17, y: 7, level: 1 },
     ],
-    unlocks: ['forest_edge', 'training_grounds'],
+    unlocks: ['forest_edge'],
     warriorReward: false,
     missions: [
       {
         id: 'trivial_plain_m1',
         name: 'Trivial Plain',
-        name_ja: '平原の小手調べ',
+        name_ja: '平原',
         difficulty: 'easy',
         rewardType: 'starter_pack',
         battleType: 'Basic',
@@ -308,15 +313,15 @@ const MISSIONS = {
     id: 'forest_edge',
     name: "The Forest's Edge",
     name_ja: '森の縁',
-    x: 72, y: 50,
+    x: 73.2, y: 49.1,  // ★S2
     enemies: [
       { classKey: 'coyote', x: 16, y: 2, level: 2 },
       { classKey: 'coyote', x: 18, y: 4, level: 2 },
       { classKey: 'badger', x: 17, y: 6, level: 1 },
     ],
-    unlocks: ['glade', 'bear_cave'],
+    unlocks: ['village'],
     warriorReward: false,
-    chest: { type: 'blue_key' },
+    chest: { type: 'blue_key' },  // ★1個目のBLUE KEY (B1かB2どちらか開錠用)
     missions: [
       {
         id: 'forest_edge_m1',
@@ -382,18 +387,108 @@ const MISSIONS = {
     ],
   },
 
+  village: {
+    id: 'village',
+    name: 'The Village',
+    name_ja: '村',
+    x: 59.0, y: 61.5,  // ★S3
+    enemies: [
+      { classKey: 'monk', x: 16, y: 3, level: 2 },
+      { classKey: 'gladiator', x: 18, y: 5, level: 2 },
+      { classKey: 'archer', x: 17, y: 7, level: 2 },
+    ],
+    unlocks: ['academy'],
+    warriorReward: true,
+    warriorPool: ['monk', 'gladiator', 'archer'],
+    routeFlag: 'blue_completed',
+  },
+
+  academy: {
+    id: 'academy',
+    name: 'The Academy',
+    name_ja: 'アカデミー',
+    x: 48.3, y: 52.8,  // ★S4
+    enemies: [
+      { classKey: 'serpent', x: 16, y: 3, level: 3 },
+      { classKey: 'badger', x: 18, y: 5, level: 3 },
+      { classKey: 'coyote', x: 17, y: 7, level: 3 },
+    ],
+    unlocks: ['tournament'],  // ★S4→S6 武闘大会
+    warriorReward: false,
+    chest: { type: 'item_rare' },
+  },
+
+  tournament: {
+    id: 'tournament',
+    name: 'The Tournament',
+    name_ja: '武闘大会',
+    x: 38.1, y: 40.8,  // ★S6: 中ボス
+    enemies: [
+      { classKey: 'champion', x: 17, y: 3, level: 3, rank: 'elite' },
+      { classKey: 'knight', x: 18, y: 5, level: 3, rank: 'elite' },
+      { classKey: 'barbarian', x: 17, y: 7, level: 3, rank: 'boss' },
+    ],
+    unlocks: ['dueling_grounds'],  // ★S6→S10 真ラスボス
+    warriorReward: false,
+    chest: { type: 'gold_key' },  // ★中ボス撃破でGOLD KEY (G1門開錠用)
+    isBossBattle: true,  // 中ボス
+  },
+
+  dueling_grounds: {
+    id: 'dueling_grounds',
+    name: 'The Dueling Grounds',
+    name_ja: '決闘場',
+    x: 35.0, y: 19.2,  // ★S10: 真のラスボス、ACT1 GOAL
+    enemies: [
+      { classKey: 'bandit_boss', x: 17, y: 5, level: 5, rank: 'boss' },
+    ],
+    unlocks: [],
+    isFinal: true,
+    requiresKey: 'gold',  // ★GOLD門 (G1) で開錠
+    warriorReward: false,
+    isBossBattle: true,
+  },
+
+  // ===== BLUEルート分岐 (B1経由: S8, S9, E5, $4) =====
+  the_crag: {
+    id: 'the_crag',
+    name: 'The Crag',
+    name_ja: '岩山',
+    x: 8.9, y: 43.2,  // ★S8
+    enemies: [],
+    unlocks: ['bear_cave'],
+    warriorReward: false,
+    requiresKey: 'blue',
+    notImplemented: true,
+  },
+
+  bear_cave: {
+    id: 'bear_cave',
+    name: 'Bear Cave',
+    name_ja: '熊洞窟',
+    x: 15.3, y: 24.5,  // ★S9
+    enemies: [],
+    unlocks: [],
+    warriorReward: false,
+    requiresKey: 'blue',
+    chest: { type: 'blue_key' },  // ★S9で2個目のBLUE KEY入手 (反対側B2解放用)
+    notImplemented: true,
+  },
+
+  // ===== BLUEルート分岐 (B2経由: S5, S11, E2, E3, $2) =====
   glade: {
     id: 'glade',
     name: 'The Glade',
     name_ja: '林の空き地',
-    x: 28, y: 53,
+    x: 32.0, y: 70.5,  // ★S5
     enemies: [
       { classKey: 'badger', x: 16, y: 3, level: 2 },
       { classKey: 'badger', x: 18, y: 5, level: 2 },
       { classKey: 'coyote', x: 17, y: 7, level: 2 },
     ],
-    unlocks: ['academy'],
+    unlocks: ['training_grounds'],
     warriorReward: false,
+    requiresKey: 'blue',
     missions: [
       {
         id: 'glade_m1',
@@ -462,153 +557,55 @@ const MISSIONS = {
     ],
   },
 
-  // ★Phase3: 旧 ruins → academy にリネーム
-  academy: {
-    id: 'academy',
-    name: 'The Academy',
-    name_ja: 'アカデミー',
-    x: 52, y: 50,
-    enemies: [
-      { classKey: 'serpent', x: 16, y: 3, level: 3 },
-      { classKey: 'badger', x: 18, y: 5, level: 3 },
-      { classKey: 'coyote', x: 17, y: 7, level: 3 },
-    ],
-    unlocks: ['village'],
-    warriorReward: false,
-    requiresKey: 'gold',  // GOLD鍵 (Progress II) で開放
-    chest: { type: 'item_rare' },
-  },
-
-  village: {
-    id: 'village',
-    name: 'The Village',
-    name_ja: '村',
-    x: 45, y: 45,
-    enemies: [
-      { classKey: 'monk', x: 16, y: 3, level: 2 },
-      { classKey: 'gladiator', x: 18, y: 5, level: 2 },
-      { classKey: 'archer', x: 17, y: 7, level: 2 },
-    ],
-    unlocks: ['tournament', 'sandy_shore'],
-    warriorReward: true,
-    warriorPool: ['monk', 'gladiator', 'archer'],
-    routeFlag: 'blue_completed',
-  },
-
-  tournament: {
-    id: 'tournament',
-    name: 'The Tournament',
-    name_ja: '武闘大会',
-    x: 28, y: 13,
-    enemies: [
-      { classKey: 'champion', x: 17, y: 3, level: 3, rank: 'elite' },
-      { classKey: 'knight', x: 18, y: 5, level: 3, rank: 'elite' },
-      { classKey: 'barbarian', x: 17, y: 7, level: 3, rank: 'boss' },
-    ],
-    unlocks: ['dueling_grounds'],
-    isFinal: true,
-    requiresKey: 'gold',  // GOLD鍵 (Progress III) で開放
-    warriorReward: false,
-  },
-
-  // ★Phase3: 旧 tavern → bear_cave にリネーム (隠しボスエリア)
-  bear_cave: {
-    id: 'bear_cave',
-    name: 'Bear Cave',
-    name_ja: '熊の洞窟',
-    x: 13, y: 25,
-    enemies: [
-      { classKey: 'bandit_boss', x: 17, y: 5, level: 4 },
-    ],
-    unlocks: [],
-    warriorReward: false,
-    requiresKey: 'blue',  // BLUE鍵 (Gate of Bears) で開放
-    chest: { type: 'gold_key' },  // 撃破でGOLD鍵入手
-    isBossBattle: true,
-  },
-
-  // ★Phase3: 旧 temple → sandy_shore にリネーム
-  sandy_shore: {
-    id: 'sandy_shore',
-    name: 'Sandy Shore',
-    name_ja: '砂浜',
-    x: 55, y: 18,
-    enemies: [
-      { classKey: 'alchemist', x: 16, y: 3, level: 3, rank: 'elite' },
-      { classKey: 'serpent', x: 18, y: 5, level: 3 },
-      { classKey: 'jungleman', x: 17, y: 7, level: 3 },
-    ],
-    unlocks: [],
-    warriorReward: true,
-    warriorPool: ['alchemist', 'serpent', 'jungleman'],
-    requiresKey: 'blue',  // BLUE鍵 (Gate of Sea) で開放
-    routeFlag: 'gold_completed',
-  },
-
-  // ============================================
-  // ★Phase3 新規追加3エリア (中身は次回以降、ノード表示のみ)
-  // クリック時は notImplemented フラグで「未実装」トースト
-  // ============================================
-
-  the_crag: {
-    id: 'the_crag',
-    name: 'The Crag',
-    name_ja: '岩山',
-    x: 78, y: 13,
-    enemies: [],
-    unlocks: [],
-    warriorReward: false,
-    requiresKey: 'blue',  // BLUE鍵 (Gate of Crags) で開放
-    notImplemented: true,
-  },
-
-  dueling_grounds: {
-    id: 'dueling_grounds',
-    name: 'The Dueling Grounds',
-    name_ja: '決闘場',
-    x: 33, y: 30,
-    enemies: [],
-    unlocks: ['the_crag'],
-    warriorReward: false,
-    requiresKey: 'blue',  // BLUE鍵 (Gate of Duelist) で開放
-    notImplemented: true,
-  },
-
   training_grounds: {
     id: 'training_grounds',
     name: 'Training Grounds',
     name_ja: '訓練場',
-    x: 8, y: 78,  // ★スクショで読み取った正確な値
+    x: 12.5, y: 83.3,  // ★S11
     enemies: [],
     unlocks: [],
     warriorReward: false,
-    requiresKey: 'blue',  // BLUE鍵 (Gate of Training) で開放
+    requiresKey: 'blue',
+    chest: { type: 'blue_key' },  // ★S11で2個目のBLUE KEY入手 (反対側B1解放用)
     notImplemented: true,
+  },
+
+  // ===== 砂浜 (S7) - 場所のみ、本筋でも分岐でもない位置 (今のところ独立寄り道) =====
+  sandy_shore: {
+    id: 'sandy_shore',
+    name: 'Sandy Shore',
+    name_ja: '砂浜',
+    x: 56.7, y: 20.9,  // ★S7
+    enemies: [],
+    unlocks: [],
+    warriorReward: false,
+    notImplemented: true,  // ★今回ロジック未実装、タップで未実装トースト
   },
 };
 
-// ★Phase3 v7: マップ装飾要素 (ゲート・ショップ) - 丸消し版マップ対応
+// ★Phase3 v8: マップ装飾 (3ゲート + 4ショップ + 5イベント) - SHIBA確定配置
 const MAP_DECORATIONS = {
   gates: [
-    // ★Phase3 v7: 丸消し版マップ + SHIBAさん指示の最終配置
-    // GOLDゲート (本筋ルートの障壁)
-    { id: 'gate_progress_1', name: 'Progress I',   type: 'gold', x: 60, y: 53 },  // Forest's Edge ⇄ Village
-    { id: 'gate_progress_2', name: 'Progress II',  type: 'gold', x: 38, y: 50 },  // Academy ⇄ Glade
-    { id: 'gate_progress_3', name: 'Progress III', type: 'gold', x: 28, y: 30 },  // Glade ⇄ Tournament
-    // BLUEゲート (隠しエリアへの分岐)
-    { id: 'gate_bears',    name: 'Gate of Bears',    type: 'blue', x: 15, y: 14 },  // Tournament ⇄ Bear Cave
-    { id: 'gate_training', name: 'Gate of Training', type: 'blue', x: 25, y: 73 },  // Glade ⇄ 訓練場
-    { id: 'gate_sea',      name: 'Gate of Sea',      type: 'blue', x: 42, y: 22 },  // Tournament経路 ⇄ Sandy Shore
-    { id: 'gate_duelist',  name: 'Gate of Duelist',  type: 'blue', x: 33, y: 38 },  // Forest's Edge ⇄ Dueling
-    { id: 'gate_crags',    name: 'Gate of Crags',    type: 'blue', x: 70, y: 22 },  // Sandy Shore ⇄ The Crag
+    // GOLDゲート (G1) - 黄色長方形(木橋)
+    { id: 'gate_gold_1', name: 'Gold Gate',  type: 'gold', x: 42.1, y: 22.8 },
+    // BLUEゲート (B1, B2) - 自動検出
+    { id: 'gate_blue_1', name: 'Blue Gate I',  type: 'blue', x: 26.7, y: 32.4 },  // B1: 山岳麓
+    { id: 'gate_blue_2', name: 'Blue Gate II', type: 'blue', x: 39.6, y: 63.2 },  // B2: 中央道
   ],
   shops: [
-    // ショップ (購買所) - クリック時は「未実装」トースト
-    { id: 'shop_outpost',  name: 'The Outpost',           x: 40, y: 80 },  // ★中央下の池(SHIBA指示)
-    { id: 'shop_armory',   name: 'The Armory',            x: 35, y: 13 },  // Tournament隣
-    { id: 'shop_village',  name: 'The Village Shop',      x: 42, y: 39 },  // Village北
-    { id: 'shop_academy',  name: 'The Academy Shop',      x: 56, y: 53 },  // Academy右下
-    { id: 'shop_lemuel',   name: "Lemuel's Knick Knacks", x: 60, y: 22 },  // Sandy Shore近く
+    // ショップ (4個) - 自動検出
+    { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.4 },  // $1: 山岳南
+    { id: 'shop_2', name: 'Shop 2', x: 47.0, y: 30.6 },  // $2: テント陣営右
+    { id: 'shop_3', name: 'Shop 3', x: 59.0, y: 45.3 },  // $3: 廃屋右上
+    { id: 'shop_4', name: 'Shop 4', x: 18.9, y: 92.1 },  // $4: 左下端
+  ],
+  events: [
+    // イベントバトル (5個) - 自動検出
+    { id: 'event_lone_challenger', name: 'Lone Challenger', name_ja: '孤高の挑戦者',          x: 72.3, y: 68.4 },  // E1
+    { id: 'event_potion_master',   name: 'Potion Master',   name_ja: '泉のポーションマスター', x: 29.2, y: 63.3 },  // E2
+    { id: 'event_bandit_chief',    name: 'Bandit Chief',    name_ja: '山賊頭領との戦い',      x:  7.9, y: 70.6 },  // E3
+    { id: 'event_coastline',       name: 'Coastline',       name_ja: '海岸線',               x: 70.8, y: 24.0 },  // E4
+    { id: 'event_bear_encounter',  name: 'Bear Encounter',  name_ja: '熊との遭遇',            x: 20.9, y: 29.3 },  // E5
   ],
 };
 
