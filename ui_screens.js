@@ -273,7 +273,9 @@ function showNodeNameToast(mission) {
 }
 
 // ★Phase3 v2: マップを画面いっぱいに拡大(上下ヘッダー以外全部マップ)
-// CSSで .map-area の高さが固定されてても、インラインstyleで強制上書き
+// ★Phase3 v3: バグ修正 - displayを直接いじらず、画面切り替え(.active class)を邪魔しない
+// CSSで .screen { display: none } .screen.active { display: flex } 等の切り替えを尊重するため、
+// displayプロパティはCSS任せにして、レイアウト系プロパティだけ個別設定する
 function applyFullscreenMapLayout() {
   const screen = document.getElementById('screen-map');
   const topBar = screen ? screen.querySelector('.map-top-bar') : null;
@@ -281,21 +283,74 @@ function applyFullscreenMapLayout() {
   const mapHint = document.getElementById('map-hint');
 
   if (screen) {
-    // 画面全体をflex縦並びにする
-    screen.style.cssText += ';display:flex;flex-direction:column;height:100vh;height:100dvh;padding:0;margin:0;box-sizing:border-box;';
+    // displayはCSSに任せる。レイアウト系プロパティだけ個別設定
+    screen.style.flexDirection = 'column';
+    screen.style.height = '100dvh';
+    screen.style.padding = '0';
+    screen.style.margin = '0';
+    screen.style.boxSizing = 'border-box';
+    // CSSで display:none/block の切り替えがあっても、display:flex 強制をやめる
+    // → CSSの .screen.active { display: flex } を期待する
+    // 万が一 CSS側が display:block の場合のフォールバック: activeのときだけflexを足す
+    if (screen.classList.contains('active')) {
+      screen.style.display = 'flex';
+    }
   }
   if (topBar) {
-    topBar.style.cssText += ';flex:0 0 auto;';
+    topBar.style.flex = '0 0 auto';
   }
   if (mapArea) {
-    // マップは残り全部使う
-    mapArea.style.cssText += ';flex:1 1 auto;height:auto;min-height:0;width:100%;background-size:cover;background-position:center;background-repeat:no-repeat;position:relative;overflow:hidden;';
+    mapArea.style.flex = '1 1 auto';
+    mapArea.style.height = 'auto';
+    mapArea.style.minHeight = '0';
+    mapArea.style.width = '100%';
+    mapArea.style.backgroundSize = 'cover';
+    mapArea.style.backgroundPosition = 'center';
+    mapArea.style.backgroundRepeat = 'no-repeat';
+    mapArea.style.position = 'relative';
+    mapArea.style.overflow = 'hidden';
   }
   if (mapHint) {
-    mapHint.style.cssText += ';flex:0 0 auto;font-size:10px;padding:4px 8px;line-height:1.2;';
+    mapHint.style.flex = '0 0 auto';
+    mapHint.style.fontSize = '10px';
+    mapHint.style.padding = '4px 8px';
+    mapHint.style.lineHeight = '1.2';
     mapHint.textContent = '▶ シングルタップ=名前 / ダブルタップ=開く';
   }
 }
+
+// ★Phase3 v3: 画面切り替え時に screen-map の display を毎回正しくセット
+// goTo('map') 等で .active が付いた時に呼ばれるよう、MutationObserverで監視
+(function setupMapDisplayWatcher() {
+  if (typeof MutationObserver === 'undefined') return;
+  // DOMContentLoaded後に登録
+  function init() {
+    const screen = document.getElementById('screen-map');
+    if (!screen) {
+      // まだDOMに無ければ少し待って再試行
+      setTimeout(init, 100);
+      return;
+    }
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.attributeName === 'class') {
+          if (screen.classList.contains('active')) {
+            screen.style.display = 'flex';
+          } else {
+            // active外れたらインラインstyle消してCSS任せに(他の画面に切り替わった時)
+            screen.style.removeProperty('display');
+          }
+        }
+      }
+    });
+    observer.observe(screen, { attributes: true, attributeFilter: ['class'] });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
 
 // ★Phase3: ゲート(GOLD/BLUE)とショップを視覚表示として描画
 // MAP_DECORATIONSはdata_game.jsで定義。ロジックには関与せず純粋な装飾。
@@ -399,6 +454,14 @@ function renderMapEdges() {
       } else if (state.cleared.includes(m.id) && state.available.includes(targetId)) {
         line.classList.add('available');
       }
+
+      // ★Phase3 v3: 黄色点線(原作Tactical Warrior風) - 本筋ルート(GOLD)を点線化
+      // インラインstyleで上書き(CSSの設定があってもこちらが優先)
+      line.setAttribute('stroke', '#ffc940');
+      line.setAttribute('stroke-width', '3');
+      line.setAttribute('stroke-dasharray', '8 6');  // 8px線、6px隙間
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('opacity', '0.85');
 
       svg.appendChild(line);
     });
