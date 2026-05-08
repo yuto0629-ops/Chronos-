@@ -356,6 +356,8 @@ function initBattle(missionId) {
       y: 2 + i * 2,
       charName: pd.charName,
     });
+    // ★B-3,B-4: partyIdx記録(EXP分配で本人特定に使う)
+    unit.partyIdx = i;
     // スキルLv引き継ぎ
     unit.skillLevels = pd.skillLevels || {};
     // ★Phase 3 A-1: skillLevelsに応じてMaxSTを動的再計算
@@ -591,7 +593,12 @@ function processStatusEffects(unit) {
     if (status.type === 'poison') {
       // 毒ダメージ(防御無視)
       const dmg = status.dmg || 5;
+      const wasAlive = unit.hp > 0;
       unit.hp = Math.max(0, unit.hp - dmg);
+      // ★B-3: 毒で殺した瞬間のcaster記録(複数毒重ねがけの場合は最初に致命傷を入れた毒のcaster)
+      if (wasAlive && unit.hp === 0 && status.casterId) {
+        unit.killedBy = status.casterId;
+      }
       showDamagePopup(unit, dmg, false, 'poison');
       addLog(`${unit.name} は<span style="color:#88e060">毒</span>で${dmg}ダメージ`);
       flashUnit(unit, 'poison');
@@ -2297,7 +2304,16 @@ function applyDamage(attacker, target, skill) {
     baseDamage = Math.floor(baseDamage);
     const finalDamage = Math.max(1, baseDamage - defense);
     totalDamage += finalDamage;
+    const wasAlive = target.hp > 0;
     target.hp = Math.max(0, target.hp - finalDamage);  // ★HPが負にならないようガード
+    // ★B-3: 殺した瞬間に attacker を記録(EXP分配で使う)
+    if (wasAlive && target.hp === 0 && attacker.side === 'ally' && !attacker.isPet) {
+      target.killedBy = attacker.id;
+    }
+    // ペットが殺した場合は主人にEXP帰属
+    if (wasAlive && target.hp === 0 && attacker.isPet && attacker.ownerId) {
+      target.killedBy = attacker.ownerId;
+    }
   }
 
   showDamagePopup(target, totalDamage, critCount > 0 && critCount === skill.hits);
@@ -2410,7 +2426,9 @@ function applyStatusFromSkill(skill, target, attacker) {
   // 既存の同種状態があればターン上書き(重複ありの毒は重ねがけ)
   if (statusType === 'poison') {
     // 毒は重ねがけ(原作仕様: 重複可)
-    target.statuses.push({ type: 'poison', turns: def.default_turns, dmg });
+    // ★B-3: caster記録(毒キル時のEXP帰属用)
+    const casterId = attacker.isPet ? attacker.ownerId : attacker.id;
+    target.statuses.push({ type: 'poison', turns: def.default_turns, dmg, casterId });
   } else if (skill.status === 'armor_down_jav') {
     // ★Javelin Sting: 近接-2 / 遠距離-3 / 特殊0 (Lvで増加するロジックは後で)
     const dn = [2, 3, 0];
@@ -2944,30 +2962,29 @@ function onMissionVictory() {
     }
   });
 
-  // ★戦闘後HP全回復(死亡してても全員HP満タンで戻る、難易度緩和の仕様)
-  state.partyData.forEach(pd => {
-    pd.hp = pd.maxHP;
-  });
-
-  // EXP計算 (再挑戦時は0)
-  const expGained = isReplay ? 0 : calculateExpGain(mission, allyUnits);
+  // ★B-3,B-4: HP回復前にEXP計算する(HP=1判定が消えないよう)
+  // EXP計算 (再挑戦時は全員0)
+  let expData;
+  if (isReplay) {
+    const perChar = {};
+    state.partyData.forEach((pd, idx) => { perChar[idx] = 0; });
+    expData = { perChar, baseBonus: 0 };
+  } else {
+    expData = calculateExpGain(mission, allyUnits);
+  }
 
   // EXP獲得前のスナップショットを取る(アニメーション用)
-  const expSnapshots = state.partyData.map(pd => ({
+  const expSnapshots = state.partyData.map((pd, idx) => ({
     classKey: pd.classKey,
     name: CLASSES[pd.classKey].name_ja,
     levelBefore: pd.level,
     expBefore: pd.exp,
-    expGained: pd.hp <= 1 ? Math.floor(expGained / 2) : expGained,
+    expGained: expData.perChar[idx] || 0,
   }));
 
   // 経験値分配 + Lvアップ判定
-  state.partyData.forEach(pd => {
-    if (pd.hp <= 1 && pd.hp === 1) {
-      pd.exp += Math.floor(expGained / 2);
-    } else {
-      pd.exp += expGained;
-    }
+  state.partyData.forEach((pd, idx) => {
+    pd.exp += expData.perChar[idx] || 0;
 
     while (pd.exp >= expRequired(pd.level)) {
       pd.exp -= expRequired(pd.level);
@@ -2977,6 +2994,11 @@ function onMissionVictory() {
       pd.hp += hpGain;
       pd.skillPoints = (pd.skillPoints || 0) + 1;
     }
+  });
+
+  // ★戦闘後HP全回復(EXP計算後に実施 - HP=1判定が必要なので)
+  state.partyData.forEach(pd => {
+    pd.hp = pd.maxHP;
   });
 
   // ミッションクリア + 次ノード解放
@@ -3043,32 +3065,67 @@ function onMissionVictory() {
   }
 
   // XP獲得アニメ → 報酬画面
+  // ★B-3,B-4: 表示用のtotal(全員合計)
+  const expGainedTotal = Object.values(expData.perChar).reduce((a, b) => a + b, 0);
+
   // ★v3.10: ボス戦の場合、XP画面の前に撃破ダイアログを挟む
   if (mission.isBossBattle) {
     showBossPostBattleDialog(mission, () => {
-      showXpGainScreen(mission, expGained, expSnapshots);
+      showXpGainScreen(mission, expGainedTotal, expSnapshots);
     });
   } else {
-    showXpGainScreen(mission, expGained, expSnapshots);
+    showXpGainScreen(mission, expGainedTotal, expSnapshots);
   }
 }
 
 // ====== EXP計算(原作仕様 7.1) ======
+// ★B-3,B-4: per-character分配
+// 戻り値: { perChar: {pdId: expValue}, totalDistributed: number }
 function calculateExpGain(mission, allyUnits) {
   const partySize = state.partyData.length;
-  const aliveSize = allyUnits.filter(u => !u.dead).length;
 
-  // 出撃ボーナス: 全員一律(ミッション難易度に応じて)
+  // ① 出撃ボーナス: 全員一律
   const enemyTotalLv = (mission.enemies || []).reduce((sum, e) => sum + (e.level || 1), 0);
   const baseBonus = 30 + enemyTotalLv * 15;
 
-  // 生存ボーナス
-  const survivalBonus = aliveSize > 0 ? Math.floor(40 * aliveSize / partySize) : 0;
+  // ② 撃破ボーナス: killedBy で本人のみ
+  // 敵ユニットの killedBy を集計
+  const killCredits = {};  // {pdId: totalKillBonus}
+  battle.units.filter(u => u.side === 'enemy' && u.dead).forEach(enemy => {
+    if (enemy.killedBy) {
+      const lv = enemy.level || 1;
+      killCredits[enemy.killedBy] = (killCredits[enemy.killedBy] || 0) + lv * 25;
+    }
+  });
 
-  // 撃破ボーナス
-  const killBonus = (mission.enemies || []).reduce((sum, e) => sum + (e.level || 1) * 25, 0);
+  // ③ 生存ボーナス: 生き残った人のみ40
+  // HP=1で生き残った人は半額(20)
+  const perChar = {};
+  state.partyData.forEach((pd, idx) => {
+    // partyDataにはpdIdが無いので、index基準で対応するallyUnitを探す
+    const ally = allyUnits.find(u => u.classKey === pd.classKey && u.partyIdx === idx);
+    let exp = baseBonus;
 
-  return baseBonus + survivalBonus + killBonus;
+    if (ally) {
+      // 撃破ボーナス
+      const killBonus = killCredits[ally.id] || 0;
+      exp += killBonus;
+
+      // 生存ボーナス
+      if (!ally.dead) {
+        if (ally.hp <= 1) {
+          exp += 20;  // HP=1: 半額
+        } else {
+          exp += 40;  // 通常生存
+        }
+      }
+      // 死亡: 出撃ボーナスのみ(=baseBonus単独)
+    }
+
+    perChar[idx] = exp;
+  });
+
+  return { perChar, baseBonus };
 }
 
 // ====== ミッション敗北処理 ======
