@@ -282,7 +282,7 @@ const MISSIONS = {
     id: 'trivial_plain',
     name: 'The Trivial Plain',
     name_ja: '平原',
-    x: 88.5, y: 61.5,  // ★S1: 右下START
+    x: 88.6, y: 61.3,  // ★S1: 右下START
     enemies: [
       { classKey: 'coyote', x: 17, y: 3, level: 1 },
       { classKey: 'coyote', x: 18, y: 5, level: 1 },
@@ -313,7 +313,7 @@ const MISSIONS = {
     id: 'forest_edge',
     name: "The Forest's Edge",
     name_ja: '森の縁',
-    x: 73.2, y: 49.1,  // ★S2
+    x: 73.3, y: 49.1,  // ★S2
     enemies: [
       { classKey: 'coyote', x: 16, y: 2, level: 2 },
       { classKey: 'coyote', x: 18, y: 4, level: 2 },
@@ -391,7 +391,7 @@ const MISSIONS = {
     id: 'village',
     name: 'The Village',
     name_ja: '村',
-    x: 59.0, y: 61.5,  // ★S3
+    x: 59.1, y: 61.3,  // ★S3
     enemies: [
       { classKey: 'monk', x: 16, y: 3, level: 2 },
       { classKey: 'gladiator', x: 18, y: 5, level: 2 },
@@ -407,7 +407,7 @@ const MISSIONS = {
     id: 'academy',
     name: 'The Academy',
     name_ja: 'アカデミー',
-    x: 48.3, y: 52.8,  // ★S4
+    x: 48.4, y: 52.7,  // ★S4
     enemies: [
       { classKey: 'serpent', x: 16, y: 3, level: 3 },
       { classKey: 'badger', x: 18, y: 5, level: 3 },
@@ -422,7 +422,7 @@ const MISSIONS = {
     id: 'tournament',
     name: 'The Tournament',
     name_ja: '武闘大会',
-    x: 38.1, y: 40.8,  // ★S6: 中ボス
+    x: 38.2, y: 41.0,  // ★S6: 中ボス
     enemies: [
       { classKey: 'champion', x: 17, y: 3, level: 3, rank: 'elite' },
       { classKey: 'knight', x: 18, y: 5, level: 3, rank: 'elite' },
@@ -454,7 +454,7 @@ const MISSIONS = {
     id: 'the_crag',
     name: 'The Crag',
     name_ja: '岩山',
-    x: 8.9, y: 43.2,  // ★S8
+    x: 8.9, y: 43.1,  // ★S8
     enemies: [],
     unlocks: ['bear_cave'],
     warriorReward: false,
@@ -466,7 +466,7 @@ const MISSIONS = {
     id: 'bear_cave',
     name: 'Bear Cave',
     name_ja: '熊洞窟',
-    x: 15.3, y: 24.5,  // ★S9
+    x: 15.4, y: 24.5,  // ★S9
     enemies: [],
     unlocks: [],
     warriorReward: false,
@@ -480,7 +480,7 @@ const MISSIONS = {
     id: 'glade',
     name: 'The Glade',
     name_ja: '林の空き地',
-    x: 32.0, y: 70.5,  // ★S5
+    x: 32.1, y: 70.4,  // ★S5
     enemies: [
       { classKey: 'badger', x: 16, y: 3, level: 2 },
       { classKey: 'badger', x: 18, y: 5, level: 2 },
@@ -561,7 +561,7 @@ const MISSIONS = {
     id: 'training_grounds',
     name: 'Training Grounds',
     name_ja: '訓練場',
-    x: 12.5, y: 83.3,  // ★S11
+    x: 12.5, y: 83.1,  // ★S11
     enemies: [],
     unlocks: [],
     warriorReward: false,
@@ -575,7 +575,7 @@ const MISSIONS = {
     id: 'sandy_shore',
     name: 'Sandy Shore',
     name_ja: '砂浜',
-    x: 56.7, y: 20.9,  // ★S7
+    x: 56.8, y: 21.0,  // ★S7
     enemies: [],
     unlocks: [],
     warriorReward: false,
@@ -586,26 +586,22 @@ const MISSIONS = {
 // ★Phase3 v8: マップ装飾 (3ゲート + 4ショップ + 5イベント) - SHIBA確定配置
 const MAP_DECORATIONS = {
   gates: [
-    // GOLDゲート (G1) - 黄色長方形(木橋)
-    { id: 'gate_gold_1', name: 'Gold Gate',  type: 'gold', x: 42.1, y: 22.8 },
-    // BLUEゲート (B1, B2) - 自動検出
-    { id: 'gate_blue_1', name: 'Blue Gate I',  type: 'blue', x: 26.7, y: 32.4 },  // B1: 山岳麓
-    { id: 'gate_blue_2', name: 'Blue Gate II', type: 'blue', x: 39.6, y: 63.2 },  // B2: 中央道
+    { id: 'gate_gold_1', name: 'Gold Gate',  type: 'gold', x: 41.9, y: 23.0 },
+    { id: 'gate_blue_1', name: 'Blue Gate I',  type: 'blue', x: 26.7, y: 32.4 },
+    { id: 'gate_blue_2', name: 'Blue Gate II', type: 'blue', x: 39.7, y: 63.1 },
   ],
   shops: [
-    // ショップ (4個) - 自動検出
-    { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.4 },  // $1: 山岳南
-    { id: 'shop_2', name: 'Shop 2', x: 47.0, y: 30.6 },  // $2: テント陣営右
-    { id: 'shop_3', name: 'Shop 3', x: 59.0, y: 45.3 },  // $3: 廃屋右上
-    { id: 'shop_4', name: 'Shop 4', x: 18.9, y: 92.1 },  // $4: 左下端
+    { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.5 },
+    { id: 'shop_2', name: 'Shop 2', x: 47.0, y: 30.6 },
+    { id: 'shop_3', name: 'Shop 3', x: 59.1, y: 45.4 },
+    { id: 'shop_4', name: 'Shop 4', x: 18.9, y: 91.9 },
   ],
   events: [
-    // イベントバトル (5個) - 自動検出
-    { id: 'event_lone_challenger', name: 'Lone Challenger', name_ja: '孤高の挑戦者',          x: 72.3, y: 68.4 },  // E1
-    { id: 'event_potion_master',   name: 'Potion Master',   name_ja: '泉のポーションマスター', x: 29.2, y: 63.3 },  // E2
-    { id: 'event_bandit_chief',    name: 'Bandit Chief',    name_ja: '山賊頭領との戦い',      x:  7.9, y: 70.6 },  // E3
-    { id: 'event_coastline',       name: 'Coastline',       name_ja: '海岸線',               x: 70.8, y: 24.0 },  // E4
-    { id: 'event_bear_encounter',  name: 'Bear Encounter',  name_ja: '熊との遭遇',            x: 20.9, y: 29.3 },  // E5
+    { id: 'event_lone_challenger', name: 'Lone Challenger', name_ja: '孤高の挑戦者',          x: 72.3, y: 69.0 },
+    { id: 'event_potion_master',   name: 'Potion Master',   name_ja: '泉のポーションマスター', x: 29.2, y: 63.1 },
+    { id: 'event_bandit_chief',    name: 'Bandit Chief',    name_ja: '山賊頭領との戦い',      x:  7.9, y: 70.4 },
+    { id: 'event_coastline',       name: 'Coastline',       name_ja: '海岸線',               x: 70.8, y: 24.0 },
+    { id: 'event_bear_encounter',  name: 'Bear Encounter',  name_ja: '熊との遭遇',            x: 20.9, y: 30.7 },
   ],
 };
 

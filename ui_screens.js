@@ -84,9 +84,76 @@ function updateKeyCounters() {
   }
 }
 
+// ★Phase3 v9: 透明ノードCSSを注入(初回のみ)
+function ensureTransparentNodeStyles() {
+  if (document.getElementById('phase3v9-styles')) return;
+  const css = `
+    /* 透明タップ判定 (画像のオブジェクトの上に重ねる円形ヒットエリア) */
+    .map-node.map-node-transparent {
+      position: absolute;
+      width: 6%;
+      height: 9.6%;
+      transform: translate(-50%, -50%);
+      z-index: 4;
+      cursor: pointer;
+      user-select: none;
+      pointer-events: auto;
+      border-radius: 50%;
+      transition: all 0.2s ease;
+    }
+    /* 解放済み: 淡い金色glow + 脈動 */
+    .map-node.map-node-transparent.available {
+      box-shadow: 0 0 12px 4px rgba(255, 220, 80, 0.5),
+                  inset 0 0 8px 2px rgba(255, 220, 80, 0.3);
+      animation: map-node-pulse 2s ease-in-out infinite;
+    }
+    @keyframes map-node-pulse {
+      0%, 100% { box-shadow: 0 0 12px 4px rgba(255, 220, 80, 0.5),
+                             inset 0 0 8px 2px rgba(255, 220, 80, 0.3); }
+      50%      { box-shadow: 0 0 20px 6px rgba(255, 220, 80, 0.8),
+                             inset 0 0 12px 3px rgba(255, 220, 80, 0.5); }
+    }
+    /* クリア済み: 微かな緑glow */
+    .map-node.map-node-transparent.cleared {
+      box-shadow: 0 0 8px 2px rgba(80, 220, 80, 0.4);
+    }
+    /* 鍵不足: 赤い枠 */
+    .map-node.map-node-transparent.key-locked {
+      box-shadow: 0 0 8px 2px rgba(255, 80, 80, 0.5);
+    }
+    /* 状態オーバーレイ(✓ や 🔒 を右上に小さく) */
+    .map-node-overlay {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 22px;
+      height: 22px;
+      background: rgba(0, 0, 0, 0.75);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.6);
+      z-index: 5;
+    }
+    .map-node-overlay-cleared { color: #6f6; }
+    .map-node-overlay-locked { font-size: 12px; }
+  `;
+  const style = document.createElement('style');
+  style.id = 'phase3v9-styles';
+  style.textContent = css;
+  document.head.appendChild(style);
+}
+
 function renderMap() {
   const mapArea = document.getElementById('map-area');
   if (!mapArea) return;
+
+  // ★Phase3 v9: 透明ノードCSSを注入(1回だけ)
+  ensureTransparentNodeStyles();
 
   // 防御的初期化
   if (!state.available) state.available = [];
@@ -153,68 +220,44 @@ function renderMap() {
   // ノード描画
   Object.values(MISSIONS).forEach(m => {
     const node = document.createElement('div');
-    node.className = 'map-node';
+    node.className = 'map-node map-node-transparent';  // ★Phase3 v9: 透明タップ判定
     node.style.left = m.x + '%';
     node.style.top = m.y + '%';
 
-    let circleClass = 'locked';
-    let icon = '?';
+    let state_class = 'locked';
     let clickable = false;
-    let needsKey = null;  // ★Step4: 鍵が必要だが足りない場合 ('gold' | 'blue')
+    let needsKey = null;
+    let overlay = '';  // ★状態オーバーレイ(クリア/鍵不足時のみ)
 
     if (state.cleared.includes(m.id)) {
-      circleClass = 'cleared';
-      icon = '✓';
+      state_class = 'cleared';
+      // クリア済み: 小さなチェックマークオーバーレイ
+      overlay = `<div class="map-node-overlay map-node-overlay-cleared">✓</div>`;
     } else if (state.available.includes(m.id)) {
-      // ★Step4: 鍵チェック
       if (m.requiresKey) {
         const keyCount = (state.keys && state.keys[m.requiresKey]) || 0;
         if (keyCount > 0) {
-          // 鍵あり: 通常通り進入可能
-          circleClass = 'available';
-          icon = '▶';
+          state_class = 'available';
           clickable = true;
+          // 解放済み: 淡い金色glow(.map-node-availableクラスでCSSが描く)
         } else {
-          // 鍵不足: ロック表示 + クリック不可だが反応はする(警告トースト用)
-          circleClass = 'key-locked ' + (m.requiresKey === 'gold' ? 'lock-gold' : 'lock-blue');
-          icon = '🔒';
-          clickable = true;  // クリック自体は受ける(警告のため)
+          state_class = 'key-locked';
+          clickable = true;
           needsKey = m.requiresKey;
+          // 鍵不足: 小さな🔒バッジ
+          const lockColor = m.requiresKey === 'gold' ? '#ffe060' : '#6090ff';
+          overlay = `<div class="map-node-overlay map-node-overlay-locked" style="color:${lockColor};">🔒</div>`;
         }
       } else {
-        // 鍵不要: 通常解放
-        circleClass = 'available';
-        icon = '▶';
+        state_class = 'available';
         clickable = true;
       }
     }
 
-    // ★段階1更新: バッジ(🍺🤝)は削除、ミッション選択画面で報酬わかるため
-    let badge = '';
-
-    // ★段階1: 宝箱バッジは削除(ミッション選択画面で報酬が見えるため不要)
-    // 古いコードはコメントアウトで保持(後で復活する場合用)
-    let chestBadge = '';
-
-    // ★Step4: 鍵要求バッジ(必要な鍵がない時)
-    let keyReqBadge = '';
-    if (needsKey) {
-      const keyImg = needsKey === 'gold' ? SPRITES.key_gold : SPRITES.key_blue;
-      const colorClass = needsKey === 'gold' ? 'key-req-gold' : 'key-req-blue';
-      keyReqBadge = `<div class="map-node-key-req ${colorClass}" title="${needsKey.toUpperCase()} KEY が必要">
-        <img src="data:image/png;base64,${keyImg}" alt="${needsKey}">
-      </div>`;
-    }
-
-    node.innerHTML = `
-      <div class="map-node-circle ${circleClass}">${icon}</div>
-      ${badge}
-      ${keyReqBadge}
-      <div class="map-node-label" style="display:none;">${m.name_ja}</div>
-    `;
+    node.classList.add(state_class);
+    node.innerHTML = overlay;
 
     if (clickable) {
-      // ★Phase3 v2: シングルタップで名前トースト、ダブルタップで遷移
       attachNodeTapHandler(node, m, needsKey);
     }
     nodeContainer.appendChild(node);
@@ -358,19 +401,35 @@ function ensureMapViewport(mapArea) {
 }
 
 function applyViewportStyles(viewport, mapArea) {
-  // viewport は固定アスペクト比のマップを内部に描画する。サイズは map-area より大きくしてOK
-  // ここでは mapArea のサイズを基準にして、初期は等倍で全体表示。後でtransformで拡大縮小する。
+  // ★Phase3 v5: viewport はマップ画像のアスペクト比(1600:1000 = 1.6:1)に固定
+  // map-area が縦長(iPhone)でも、マップ画像は1.6:1で表示する
+  // これにより、ノードの%座標が地形オブジェクトと正確に合う
   const rect = mapArea.getBoundingClientRect();
   const W = Math.max(rect.width, 1);
   const H = Math.max(rect.height, 1);
+  const MAP_ASPECT = 1.6;  // 1600 / 1000
+
+  // map-area の中で1.6:1のアスペクトを保ちながら最大化
+  let viewW, viewH;
+  if (W / H > MAP_ASPECT) {
+    // map-area が横長 → 高さ基準
+    viewH = H;
+    viewW = H * MAP_ASPECT;
+  } else {
+    // map-area が縦長 → 幅基準
+    viewW = W;
+    viewH = W / MAP_ASPECT;
+  }
+  
+  // map-area の中央に viewport を配置(初期 pan は中央寄せ)
   viewport.style.position = 'absolute';
   viewport.style.left = '0';
   viewport.style.top = '0';
-  viewport.style.width = W + 'px';
-  viewport.style.height = H + 'px';
+  viewport.style.width = viewW + 'px';
+  viewport.style.height = viewH + 'px';
   viewport.style.transformOrigin = '0 0';
   viewport.style.willChange = 'transform';
-  // 背景画像を viewport に設定
+  // 背景画像を viewport に設定 (アスペクト比1.6:1なので歪まない)
   if (typeof SPRITES !== 'undefined' && SPRITES.act1_map) {
     viewport.style.backgroundImage = `url(data:image/jpeg;base64,${SPRITES.act1_map})`;
     viewport.style.backgroundSize = '100% 100%';
@@ -593,42 +652,35 @@ function renderMapDecorations() {
   // 既存の装飾ノードを削除
   container.querySelectorAll('.map-deco').forEach(n => n.remove());
 
-  // 共通スタイル(マーカー本体)
-  const baseNodeStyle = 'position:absolute;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:auto;cursor:pointer;user-select:none;';
+  // ★Phase3 v9: 透明タップ判定エリア(画像のオブジェクトに重ねる)
+  // 30px円形のクリック判定だけで、見た目は透明
+  const tapAreaStyle = 'position:absolute;width:6%;height:9.6%;transform:translate(-50%,-50%);z-index:3;cursor:pointer;user-select:none;pointer-events:auto;border-radius:50%;';
 
-  // ゲート描画
+  // ゲート描画(透明タップ判定 + GOLD門だけ淡い金色glow)
   (MAP_DECORATIONS.gates || []).forEach(g => {
     const node = document.createElement('div');
     node.className = `map-deco map-deco-gate map-deco-gate-${g.type}`;
-    node.style.cssText = baseNodeStyle + `left:${g.x}%;top:${g.y}%;`;
-    const isGold = g.type === 'gold';
-    const bgColor = isGold ? 'linear-gradient(180deg,#ffe060 0%,#b88800 100%)' : 'linear-gradient(180deg,#6090ff 0%,#1840b8 100%)';
-    const borderColor = isGold ? '#fff8c0' : '#c0d8ff';
-    const textColor = isGold ? '#3a2200' : '#fff';
+    node.style.cssText = tapAreaStyle + `left:${g.x}%;top:${g.y}%;`;
     node.title = `${g.name} (${g.type.toUpperCase()} KEY)`;
-    node.innerHTML = `
-      <div style="width:22px;height:22px;background:${bgColor};border:2px solid ${borderColor};border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:${textColor};box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">🔒</div>
-    `;
+    // 中身は空(画像のゲートが見えるように)
+    node.innerHTML = '';
     node.onclick = (e) => {
-      // ジェスチャー直後ならクリック無効
       const vp = document.getElementById('map-viewport');
       if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
       e.preventDefault(); e.stopPropagation();
-      const msg = `🔒 ${g.name} (${g.type.toUpperCase()} KEY 必要)`;
+      const msg = `🔒 ${g.name} (${g.type.toUpperCase()} KEY 必要、未実装)`;
       if (typeof addLogEquipToast === 'function') addLogEquipToast(msg);
     };
     container.appendChild(node);
   });
 
-  // ショップ描画
+  // ショップ描画(透明タップ判定)
   (MAP_DECORATIONS.shops || []).forEach(s => {
     const node = document.createElement('div');
     node.className = 'map-deco map-deco-shop';
-    node.style.cssText = baseNodeStyle + `left:${s.x}%;top:${s.y}%;`;
+    node.style.cssText = tapAreaStyle + `left:${s.x}%;top:${s.y}%;`;
     node.title = s.name;
-    node.innerHTML = `
-      <div style="width:22px;height:22px;background:linear-gradient(180deg,#88ee88 0%,#228822 100%);border:2px solid #c0ffc0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,0.4),0 2px 4px rgba(0,0,0,0.6);margin:0 auto;">$</div>
-    `;
+    node.innerHTML = '';
     node.onclick = (e) => {
       const vp = document.getElementById('map-viewport');
       if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
@@ -638,20 +690,13 @@ function renderMapDecorations() {
     container.appendChild(node);
   });
 
-  // ★Phase3 v8: イベントバトル描画 (マゼンタ青リング、中身は次回実装)
+  // イベントバトル描画(透明タップ判定)
   (MAP_DECORATIONS.events || []).forEach(ev => {
     const node = document.createElement('div');
     node.className = 'map-deco map-deco-event';
-    node.style.cssText = baseNodeStyle + `left:${ev.x}%;top:${ev.y}%;`;
+    node.style.cssText = tapAreaStyle + `left:${ev.x}%;top:${ev.y}%;`;
     node.title = ev.name_ja || ev.name;
-    // マゼンタ円(外)+ 黄色コイン(内) の二重表示
-    node.innerHTML = `
-      <div style="position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;">
-        <div style="position:absolute;width:32px;height:32px;border-radius:50%;background:radial-gradient(circle,rgba(255,80,200,0.8) 0%,rgba(255,80,200,0) 70%);"></div>
-        <div style="position:absolute;width:24px;height:24px;border-radius:50%;border:3px solid #2050ff;background:transparent;"></div>
-        <div style="position:relative;width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,#ffe060 0%,#b88800 100%);border:2px solid #fff8c0;box-shadow:0 0 0 1px rgba(0,0,0,0.4);"></div>
-      </div>
-    `;
+    node.innerHTML = '';
     node.onclick = (e) => {
       const vp = document.getElementById('map-viewport');
       if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
