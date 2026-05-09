@@ -2968,6 +2968,25 @@ function onMissionVictory() {
     return;
   }
 
+  // ★Phase3 v9: イベントは独自フローで処理(XP画面・報酬画面なし)
+  if (mission.isEvent) {
+    // パーティHP復元
+    const allyUnits = battle.units.filter(u => u.side === 'ally' && !u.isPet);
+    state.partyData.forEach((pd, i) => {
+      const unit = allyUnits[i];
+      if (unit) {
+        pd.hp = unit.dead ? 0 : unit.hp;
+      }
+    });
+    // HP全回復
+    state.partyData.forEach(pd => {
+      pd.hp = pd.maxHP;
+    });
+    // VICTORY表示後、handleEventVictoryへ
+    handleEventVictory(mission, 0, []);
+    return;
+  }
+
   // ★再挑戦フラグ: 既にクリア済みのサブミッション or エリア
   const isReplay = (state.currentSubMissionId && state.clearedSubMissions.includes(state.currentSubMissionId))
                 || (!state.currentSubMissionId && state.cleared.includes(missionId));
