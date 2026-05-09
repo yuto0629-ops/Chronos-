@@ -690,24 +690,8 @@ function renderMapDecorations() {
     container.appendChild(node);
   });
 
-  // イベントバトル描画(透明タップ判定)
-  (MAP_DECORATIONS.events || []).forEach(ev => {
-    const node = document.createElement('div');
-    node.className = 'map-deco map-deco-event';
-    node.style.cssText = tapAreaStyle + `left:${ev.x}%;top:${ev.y}%;`;
-    node.title = ev.name_ja || ev.name;
-    node.innerHTML = '';
-    node.onclick = (e) => {
-      const vp = document.getElementById('map-viewport');
-      if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
-      e.preventDefault(); e.stopPropagation();
-      const label = ev.name_ja || ev.name;
-      if (typeof addLogEquipToast === 'function') {
-        addLogEquipToast(`⚔️ ${label} は次回以降のアップデートで実装予定`);
-      }
-    };
-    container.appendChild(node);
-  });
+  // ★Phase3 v9: イベントはMISSIONSに統合済みなので、ここでは描画しない
+  // (renderMap()で自動的にステージと同じ「?」「▶」「✓」アイコンで描画される)
 }
 
 // ★Phase3: 未実装エリアのクリック警告

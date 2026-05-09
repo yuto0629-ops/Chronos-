@@ -319,7 +319,7 @@ const MISSIONS = {
       { classKey: 'coyote', x: 18, y: 4, level: 2 },
       { classKey: 'badger', x: 17, y: 6, level: 1 },
     ],
-    unlocks: ['village'],
+    unlocks: ['village', 'event_lone_challenger', 'event_potion_master'],
     warriorReward: false,
     chest: { type: 'blue_key' },  // ★1個目のBLUE KEY (B1かB2どちらか開錠用)
     missions: [
@@ -486,7 +486,7 @@ const MISSIONS = {
       { classKey: 'badger', x: 18, y: 5, level: 2 },
       { classKey: 'coyote', x: 17, y: 7, level: 2 },
     ],
-    unlocks: ['training_grounds'],
+    unlocks: ['training_grounds', 'event_bandit_chief'],
     warriorReward: false,
     requiresKey: 'blue',
     missions: [
@@ -581,9 +581,82 @@ const MISSIONS = {
     warriorReward: false,
     notImplemented: true,  // ★今回ロジック未実装、タップで未実装トースト
   },
+
+  // ===== ★Phase3 v9: イベントバトル (E1〜E3を実装、E4〜E5は次回) =====
+
+  // E1: 孤高の挑戦者 - S2クリアで解放、行き止まり
+  event_lone_challenger: {
+    id: 'event_lone_challenger',
+    name: 'Lone Challenger',
+    name_ja: '孤高の挑戦者',
+    x: 72.3, y: 69.0,
+    isEvent: true,
+    eventNarration: '道に蛮族が胡坐を組んで座っている。目を合わせると、ニヤッと笑った。',
+    eventOpeningLine: { speaker: 'Tor', text: '手合わせ願おう、旅人よ!' },
+    enemies: [
+      // Tor (barbarian Lv2、AGI高め設定。固有名)
+      { classKey: 'barbarian', x: 17, y: 5, level: 2, rank: 'elite', uniqueName: 'Tor', agiBonus: 5 },
+    ],
+    unlocks: [],
+    warriorReward: false,
+    isBossBattle: false,
+    playerSlots: 1,  // ★1v1タイマン
+  },
+
+  // E2: 泉のポーションマスター - B2越え後に解放、行き止まり
+  event_potion_master: {
+    id: 'event_potion_master',
+    name: 'Potion Master',
+    name_ja: '泉のポーションマスター',
+    x: 29.2, y: 63.1,
+    isEvent: true,
+    eventNarration: '森の中の泉のすぐそば、釜を焚く老人の錬金術師がいる。釜の中は、奇妙な色に光る薬、そして提げた数のポーション達が並べられている。',
+    eventOpeningLine: { speaker: 'Mortimer', text: 'ふん…主らよ、わしの薬を試させてもらおうか' },
+    enemies: [
+      // Mortimer (alchemist Lv6 ボス、HP+50/ST+30)
+      { classKey: 'alchemist', x: 17, y: 5, level: 6, rank: 'boss', uniqueName: 'Mortimer', hpBonus: 50, stBonus: 30 },
+      // 雑魚alchemist Lv5 × 4
+      { classKey: 'alchemist', x: 14, y: 3, level: 5, rank: 'normal' },
+      { classKey: 'alchemist', x: 20, y: 3, level: 5, rank: 'normal' },
+      { classKey: 'alchemist', x: 14, y: 7, level: 5, rank: 'normal' },
+      { classKey: 'alchemist', x: 20, y: 7, level: 5, rank: 'normal' },
+    ],
+    unlocks: [],
+    warriorReward: false,
+    isBossBattle: true,
+    // requiresKey: 'blue',  // ★鍵システム実装後に有効化(B2ゲート越え必要)
+  },
+
+  // E3: 山賊頭領との戦い - S5クリアで解放、行き止まり、実質ラスボス級
+  event_bandit_chief: {
+    id: 'event_bandit_chief',
+    name: 'Bandit Chief',
+    name_ja: '山賊頭領との戦い',
+    x: 7.9, y: 70.4,
+    isEvent: true,
+    eventNarration: '崩れた小屋を住処とし、山賊達がたむろしている。鬼気迫る雰囲気の頭領が、刃物を研ぐ手を止め、こちらを見やった。',
+    eventOpeningLine: { speaker: '山賊頭領', text: '俺たちのシマに何の用だ。生きて帰れると思うな' },
+    enemies: [
+      // 頭領 (既存bandit_boss)
+      { classKey: 'bandit_boss', x: 17, y: 5, level: 5, rank: 'boss' },
+      // 子分 7体
+      { classKey: 'gladiator', x: 14, y: 3, level: 4, rank: 'normal' },
+      { classKey: 'gladiator', x: 20, y: 3, level: 4, rank: 'normal' },
+      { classKey: 'barbarian', x: 14, y: 5, level: 4, rank: 'normal' },
+      { classKey: 'barbarian', x: 20, y: 5, level: 4, rank: 'normal' },
+      { classKey: 'coyote',    x: 14, y: 7, level: 4, rank: 'normal' },
+      { classKey: 'coyote',    x: 20, y: 7, level: 4, rank: 'normal' },
+      { classKey: 'archer',    x: 17, y: 8, level: 4, rank: 'normal' },
+    ],
+    unlocks: [],
+    warriorReward: false,
+    isBossBattle: true,
+    // requiresKey: 'blue',  // ★鍵システム実装後に有効化(B2ゲート越え必要)
+    chest: { type: 'blue_key' },  // 撃破でBLUE KEY 1個入手
+  },
 };
 
-// ★Phase3 v8: マップ装飾 (3ゲート + 4ショップ + 5イベント) - SHIBA確定配置
+// ★Phase3 v9: マップ装飾 (3ゲート + 4ショップ) - イベントはMISSIONSに統合済み
 const MAP_DECORATIONS = {
   gates: [
     { id: 'gate_gold_1', name: 'Gold Gate',  type: 'gold', x: 41.9, y: 23.0 },
@@ -593,15 +666,8 @@ const MAP_DECORATIONS = {
   shops: [
     { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.5 },
     { id: 'shop_2', name: 'Shop 2', x: 47.0, y: 30.6 },
-    { id: 'shop_3', name: 'Shop 3', x: 59.1, y: 45.4 },
+    { id: 'shop_3', name: 'Shop 3', x: 50.0, y: 41.0 },
     { id: 'shop_4', name: 'Shop 4', x: 18.9, y: 91.9 },
-  ],
-  events: [
-    { id: 'event_lone_challenger', name: 'Lone Challenger', name_ja: '孤高の挑戦者',          x: 72.3, y: 69.0 },
-    { id: 'event_potion_master',   name: 'Potion Master',   name_ja: '泉のポーションマスター', x: 29.2, y: 63.1 },
-    { id: 'event_bandit_chief',    name: 'Bandit Chief',    name_ja: '山賊頭領との戦い',      x:  7.9, y: 70.4 },
-    { id: 'event_coastline',       name: 'Coastline',       name_ja: '海岸線',               x: 70.8, y: 24.0 },
-    { id: 'event_bear_encounter',  name: 'Bear Encounter',  name_ja: '熊との遭遇',            x: 20.9, y: 30.7 },
   ],
 };
 
