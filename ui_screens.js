@@ -306,7 +306,12 @@ function attachNodeTapHandler(node, mission, needsKey) {
       // ダブルタップ確定
       clearTimeout(tapTimer);
       tapTimer = null;
-      enterBattle(mission.id);
+      // ★Phase3 v9: イベントは説明モーダル経由で戦闘へ
+      if (mission.isEvent) {
+        showEventModal(mission);
+      } else {
+        enterBattle(mission.id);
+      }
     } else {
       // シングルタップ仮確定 → TAP_DELAY ms 後に確定
       tapTimer = setTimeout(() => {
@@ -325,6 +330,100 @@ function showNodeNameToast(mission) {
   } else {
     console.log(msg);
   }
+}
+
+// ★Phase3 v9: イベント説明モーダル(ダブルタップ時)
+function showEventModal(mission) {
+  // 既存モーダルがあれば消す
+  document.querySelectorAll('.event-modal-overlay').forEach(o => o.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'event-modal-overlay';
+  overlay.style.cssText = `
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.85); z-index:9999;
+    display:flex; align-items:center; justify-content:center;
+  `;
+
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(180deg,#2a1810 0%,#1a0e08 100%);
+                border:2px solid #d4a020; border-radius:8px;
+                padding:24px 20px; max-width:480px; width:90%;
+                box-shadow:0 0 40px rgba(212,160,32,0.5);">
+      <div style="color:#d4a020; font-size:16px; font-weight:800; margin-bottom:16px; text-align:center; letter-spacing:2px;">
+        ⚔️ ${mission.name_ja}
+      </div>
+      <div style="color:#e8d8b8; font-size:13px; line-height:1.8; margin-bottom:24px; text-align:left; padding:12px; background:rgba(0,0,0,0.4); border-radius:4px; border-left:3px solid #d4a020;">
+        ${mission.eventNarration || mission.name_ja}
+      </div>
+      <div style="display:flex; gap:12px; justify-content:center;">
+        <button id="event-modal-cancel" style="flex:1; max-width:140px; padding:10px; background:#3a2a1a; border:1px solid #6a5040; color:#a8956e; font-weight:700; border-radius:4px; cursor:pointer; font-size:13px;">
+          やめる
+        </button>
+        <button id="event-modal-accept" style="flex:1; max-width:140px; padding:10px; background:linear-gradient(180deg,#d4a020 0%,#a07810 100%); border:1px solid #ffe060; color:#1a0e08; font-weight:800; border-radius:4px; cursor:pointer; font-size:13px;">
+          挑む
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('event-modal-cancel').onclick = () => {
+    overlay.remove();
+  };
+  document.getElementById('event-modal-accept').onclick = () => {
+    overlay.remove();
+    // 戦闘開始(イベントは subMission なし、エリア直接)
+    state.currentMission = mission.id;
+    state.currentSubMissionId = null;
+    state.currentAreaBackup = null;  // バックアップ不要
+    initBattle(mission.id);
+    goTo('battle');
+    // ★戦闘開始後にイベントセリフ表示
+    setTimeout(() => showEventOpeningDialog(mission), 200);
+  };
+}
+
+// ★Phase3 v9: 戦闘開始時のイベントセリフ表示(bandit_boss流用パターン)
+function showEventOpeningDialog(mission) {
+  if (!mission.eventOpeningLine) return;
+  const line = mission.eventOpeningLine;
+
+  // 既存モーダルがあれば消す
+  document.querySelectorAll('.event-dialog-overlay').forEach(o => o.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'event-dialog-overlay';
+  overlay.style.cssText = `
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.6); z-index:9998;
+    display:flex; align-items:flex-end; justify-content:center;
+    padding-bottom:80px;
+  `;
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(180deg,#1a0e08 0%,#0a0604 100%);
+                border:2px solid #d4a020; border-radius:6px;
+                padding:18px 22px; max-width:480px; width:90%;
+                box-shadow:0 0 30px rgba(212,160,32,0.5); cursor:pointer;">
+      <div style="color:#d4a020; font-size:12px; font-weight:800; margin-bottom:8px; letter-spacing:1px;">
+        ${line.speaker}
+      </div>
+      <div style="color:#fff; font-size:14px; line-height:1.7;">
+        「${line.text}」
+      </div>
+      <div style="text-align:right; color:#a8956e; font-size:10px; margin-top:8px;">
+        タップで閉じる
+      </div>
+    </div>
+  `;
+  overlay.onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+
+  // 自動で6秒後に閉じる(タップしなくても進める)
+  setTimeout(() => {
+    if (overlay.parentNode) overlay.remove();
+  }, 6000);
 }
 
 // ★Phase3 v2: マップを画面いっぱいに拡大(上下ヘッダー以外全部マップ)

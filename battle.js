@@ -345,8 +345,13 @@ function initBattle(missionId) {
 
   const mission = MISSIONS[missionId];
 
+  // ★Phase3 v9: playerSlots制限(イベントE1=1v1タイマン等)
+  // mission.playerSlotsが設定されていれば、partyDataの最初のN人だけ出撃
+  const maxAlly = mission && mission.playerSlots ? mission.playerSlots : state.partyData.length;
+  const partyToBattle = state.partyData.slice(0, maxAlly);
+
   // 味方配置(画面左端)+ partyDataからHP/装備復元
-  state.partyData.forEach((pd, i) => {
+  partyToBattle.forEach((pd, i) => {
     const unit = makeUnit({
       id: 'ally_' + i,
       classKey: pd.classKey,
@@ -392,7 +397,7 @@ function initBattle(missionId) {
   // 敵配置(ミッション定義から)
   const enemyConfigs = mission ? mission.enemies : [];
   enemyConfigs.forEach((cfg, i) => {
-    battle.units.push(makeUnit({
+    const unit = makeUnit({
       id: 'enemy_' + i,
       classKey: cfg.classKey,
       side: 'enemy',
@@ -400,7 +405,21 @@ function initBattle(missionId) {
       level: cfg.level,
       x: cfg.x,
       y: cfg.y,
-    }));
+      charName: cfg.uniqueName || null,  // ★Phase3 v9: 固有名(Tor, Mortimer等)
+    });
+    // ★Phase3 v9: HP/ST/AGIボーナス(Mortimer用)
+    if (cfg.hpBonus) {
+      unit.maxHP += cfg.hpBonus;
+      unit.hp = unit.maxHP;
+    }
+    if (cfg.stBonus) {
+      unit.maxST = (unit.maxST || 0) + cfg.stBonus;
+      unit.st = unit.maxST;
+    }
+    if (cfg.agiBonus) {
+      unit.agi = (unit.agi || 0) + cfg.agiBonus;
+    }
+    battle.units.push(unit);
   });
 
   // パッシブ「召喚」を持つユニットの初期召喚処理
@@ -3703,7 +3722,116 @@ function showLegacyRewardScreen(mission, expGained, levelUps) {
   });
 }
 
+// ★Phase3 v9: イベント勝利時の処理(加入 + マップ復帰)
+function handleEventVictory(mission, expGained, levelUps) {
+  const screen = document.getElementById('screen-battle');
+
+  // 加入処理: イベントごとに加入対象を決定
+  let recruit = null;
+  let recruitMessage = '';
+
+  if (mission.id === 'event_lone_challenger') {
+    // E1: Tor (barbarian Lv2, Great Stamina Lv1, Bash Lv1) が加入
+    // 既存のCLASS_NAMES等のシステムに合わせて partyData にプッシュ
+    recruit = createRecruitUnit('barbarian', 2, 'Tor');
+    recruitMessage = '🎉 Tor が仲間に加入した!';
+  } else if (mission.id === 'event_potion_master') {
+    // E2: Mortimerの弟子(alchemist Lv5)がランダム名で加入
+    const alchemistNames = (CHAR_NAMES && CHAR_NAMES.alchemist) || ['Wilbur', 'Reginald', 'Theobald', 'Algernon'];
+    const usedNames = (state.partyData || []).map(p => p.charName).filter(Boolean);
+    const available = alchemistNames.filter(n => n !== 'Mortimer' && !usedNames.includes(n));
+    const name = available[Math.floor(Math.random() * available.length)] || 'Wilbur';
+    recruit = createRecruitUnit('alchemist', 5, name);
+    recruitMessage = `🎉 ${name} (Mortimerの弟子) が仲間に加入した!`;
+  } else if (mission.id === 'event_bandit_chief') {
+    // E3: 加入なし、宝箱(BLUE KEY + Oil of Dazing)獲得
+    recruit = null;
+    recruitMessage = '🎉 山賊の宝を発見! BLUE KEY と Oil of Dazing を入手した!';
+    // BLUE KEY 付与
+    if (!state.keys) state.keys = { gold: 0, blue: 0 };
+    state.keys.blue = (state.keys.blue || 0) + 1;
+    // Oil of Dazing 付与(state.itemsか何か、シンプルに)
+    if (!state.items) state.items = [];
+    state.items.push({ id: 'oil_of_dazing', name: 'Oil of Dazing', acquired: Date.now() });
+  }
+
+  // 加入処理(state.partyDataに追加)
+  if (recruit) {
+    if (!state.partyData) state.partyData = [];
+    state.partyData.push(recruit);
+  }
+
+  // マップ復帰オーバーレイ
+  const overlay = document.createElement('div');
+  overlay.className = 'reward-overlay event-victory-overlay';
+  overlay.innerHTML = `
+    <div class="reward-content" style="text-align:center; padding: 28px 24px;">
+      <div style="font-size:14px; color:#d4a020; margin-bottom: 16px; font-weight:800;">
+        ⚔️ ${mission.name_ja} クリア
+      </div>
+      <div style="font-size:13px; color:#fff; margin-bottom: 24px; line-height: 1.6;">
+        ${recruitMessage}
+      </div>
+      <button class="ui-btn primary" id="event-victory-close" style="min-width: 140px;">
+        マップへ戻る
+      </button>
+    </div>
+  `;
+  screen.appendChild(overlay);
+
+  document.getElementById('event-victory-close').onclick = () => {
+    overlay.remove();
+    // クリア記録
+    if (!state.cleared.includes(mission.id)) {
+      state.cleared.push(mission.id);
+    }
+    // unlocks解放処理(本来onMissionVictoryで処理されてるが、念のため)
+    if (mission.unlocks) {
+      mission.unlocks.forEach(uid => {
+        if (!state.available.includes(uid)) state.available.push(uid);
+      });
+    }
+    state.currentMission = null;
+    state.currentSubMissionId = null;
+    saveState();
+    goTo('map');
+    if (typeof renderMap === 'function') renderMap();
+  };
+}
+
+// ★Phase3 v9: 加入ユニットを作成(state.partyDataフォーマット)
+function createRecruitUnit(classKey, level, charName) {
+  const cls = CLASSES[classKey];
+  if (!cls) return null;
+  const skills = SKILLS[classKey] || [];
+  // 初期スキルレベル(全Lv1)
+  const skillLevels = {};
+  skills.forEach((_, i) => { skillLevels[i] = 1; });
+  // HP計算
+  let maxHP = cls.hp_base + (cls.hp_per_level * (level - 1));
+  if (cls.hp_override) maxHP = cls.hp_override;
+  return {
+    classKey: classKey,
+    charName: charName,
+    level: level,
+    exp: 0,
+    hp: maxHP,
+    maxHP: maxHP,
+    skillLevels: skillLevels,
+    skillPoints: 0,
+    equip: {},
+    addedSkills: [],  // 報酬で追加される追加スキル
+    isRare: charName === 'Tor',  // Torはレアフラグ(プレイヤーに加入演出強調)
+  };
+}
+
 function showRewardScreen(mission, expGained, levelUps) {
+  // ★Phase3 v9: イベントは報酬画面なし、独自の勝利処理(加入&マップ復帰)
+  if (mission.isEvent) {
+    handleEventVictory(mission, expGained, levelUps);
+    return;
+  }
+
   // ★段階1更新: サブミッション報酬タイプに応じて1択モーダルを直接表示
   const subMissionId = state.currentSubMissionId;
   let subMission = null;
