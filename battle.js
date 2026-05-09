@@ -3774,29 +3774,40 @@ function handleEventVictory(mission, expGained, levelUps) {
     state.items.push({ id: 'oil_of_dazing', name: 'Oil of Dazing', acquired: Date.now() });
   }
 
-  // 加入処理(state.partyDataに追加)
+  // 加入処理(state.partyDataとstate.partyに追加)
   if (recruit) {
     if (!state.partyData) state.partyData = [];
+    if (!state.party) state.party = [];
     state.partyData.push(recruit);
+    state.party.push(recruit.classKey);  // ★既存仕様: state.partyにもclassKey追加
   }
 
-  // マップ復帰オーバーレイ
+  // マップ復帰オーバーレイ(★Phase3 v9: bodyに直接追加、z-index高)
   const overlay = document.createElement('div');
-  overlay.className = 'reward-overlay event-victory-overlay';
+  overlay.className = 'event-victory-overlay';
+  overlay.style.cssText = `
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.85); z-index:99999;
+    display:flex; align-items:center; justify-content:center;
+  `;
   overlay.innerHTML = `
-    <div class="reward-content" style="text-align:center; padding: 28px 24px;">
-      <div style="font-size:14px; color:#d4a020; margin-bottom: 16px; font-weight:800;">
+    <div style="background:linear-gradient(180deg,#2a1810 0%,#1a0e08 100%);
+                border:2px solid #d4a020; border-radius:8px;
+                padding:28px 24px; max-width:480px; width:90%;
+                box-shadow:0 0 40px rgba(212,160,32,0.6);
+                text-align:center;">
+      <div style="font-size:16px; color:#d4a020; margin-bottom: 16px; font-weight:800; letter-spacing:2px;">
         ⚔️ ${mission.name_ja} クリア
       </div>
-      <div style="font-size:13px; color:#fff; margin-bottom: 24px; line-height: 1.6;">
+      <div style="font-size:14px; color:#fff; margin-bottom: 24px; line-height: 1.7;">
         ${recruitMessage}
       </div>
-      <button class="ui-btn primary" id="event-victory-close" style="min-width: 140px;">
+      <button id="event-victory-close" style="min-width: 160px; padding:12px 20px; background:linear-gradient(180deg,#d4a020 0%,#a07810 100%); border:1px solid #ffe060; color:#1a0e08; font-weight:800; border-radius:4px; cursor:pointer; font-size:14px;">
         マップへ戻る
       </button>
     </div>
   `;
-  screen.appendChild(overlay);
+  document.body.appendChild(overlay);
 
   document.getElementById('event-victory-close').onclick = () => {
     overlay.remove();
@@ -3818,7 +3829,7 @@ function handleEventVictory(mission, expGained, levelUps) {
   };
 }
 
-// ★Phase3 v9: 加入ユニットを作成(state.partyDataフォーマット)
+// ★Phase3 v9: 加入ユニットを作成(state.partyDataフォーマット準拠)
 function createRecruitUnit(classKey, level, charName) {
   const cls = CLASSES[classKey];
   if (!cls) return null;
@@ -3833,14 +3844,14 @@ function createRecruitUnit(classKey, level, charName) {
     classKey: classKey,
     charName: charName,
     level: level,
-    exp: 0,
     hp: maxHP,
     maxHP: maxHP,
-    skillLevels: skillLevels,
+    exp: 0,
+    equipped: [],          // ★既存仕様: equipped(配列)
     skillPoints: 0,
-    equip: {},
-    addedSkills: [],  // 報酬で追加される追加スキル
-    isRare: charName === 'Tor',  // Torはレアフラグ(プレイヤーに加入演出強調)
+    skillLevels: skillLevels,
+    passiveLevel: 1,       // ★必須: passiveLevel
+    addedSkills: [],
   };
 }
 
