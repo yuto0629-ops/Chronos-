@@ -2970,6 +2970,7 @@ function onMissionVictory() {
 
   // ★Phase3 v9: イベントは独自フローで処理(XP画面・報酬画面なし)
   if (mission.isEvent) {
+    console.log('[onMissionVictory] イベント検出:', mission.id);
     // パーティHP復元
     const allyUnits = battle.units.filter(u => u.side === 'ally' && !u.isPet);
     state.partyData.forEach((pd, i) => {
@@ -3743,6 +3744,7 @@ function showLegacyRewardScreen(mission, expGained, levelUps) {
 
 // ★Phase3 v9: イベント勝利時の処理(加入 + マップ復帰)
 function handleEventVictory(mission, expGained, levelUps) {
+  console.log('[handleEventVictory] 開始:', mission.id);
   const screen = document.getElementById('screen-battle');
 
   // 加入処理: イベントごとに加入対象を決定
@@ -3809,24 +3811,36 @@ function handleEventVictory(mission, expGained, levelUps) {
   `;
   document.body.appendChild(overlay);
 
-  document.getElementById('event-victory-close').onclick = () => {
-    overlay.remove();
-    // クリア記録
-    if (!state.cleared.includes(mission.id)) {
-      state.cleared.push(mission.id);
-    }
-    // unlocks解放処理(本来onMissionVictoryで処理されてるが、念のため)
-    if (mission.unlocks) {
-      mission.unlocks.forEach(uid => {
-        if (!state.available.includes(uid)) state.available.push(uid);
-      });
-    }
-    state.currentMission = null;
-    state.currentSubMissionId = null;
-    saveState();
-    goTo('map');
-    if (typeof renderMap === 'function') renderMap();
-  };
+  // ★Phase3 v9 fix: ボタン取得を確実にしてからonclick設定
+  const closeBtn = document.getElementById('event-victory-close');
+  if (closeBtn) {
+    closeBtn.onclick = function() {
+      console.log('[event-victory] マップへ戻るボタン押下');
+      try { overlay.remove(); } catch(e) { console.error(e); }
+      // クリア記録
+      if (!state.cleared) state.cleared = [];
+      if (!state.cleared.includes(mission.id)) {
+        state.cleared.push(mission.id);
+      }
+      // unlocks解放処理
+      if (mission.unlocks) {
+        if (!state.available) state.available = [];
+        mission.unlocks.forEach(uid => {
+          if (!state.available.includes(uid)) state.available.push(uid);
+        });
+      }
+      state.currentMission = null;
+      state.currentSubMissionId = null;
+      // マップに戻る
+      try { goTo('map'); } catch(e) { console.error('[goTo map error]', e); }
+      if (typeof renderMap === 'function') {
+        try { renderMap(); } catch(e) { console.error('[renderMap error]', e); }
+      }
+    };
+    console.log('[event-victory] ボタンハンドラ設定完了');
+  } else {
+    console.error('[event-victory] event-victory-close ボタンが見つからない!');
+  }
 }
 
 // ★Phase3 v9: 加入ユニットを作成(state.partyDataフォーマット準拠)
