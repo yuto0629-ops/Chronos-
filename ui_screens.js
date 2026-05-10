@@ -268,6 +268,210 @@ function renderMap() {
 
   // エッジ(線)描画(layoutが確定してから)
   requestAnimationFrame(() => renderMapEdges());
+
+  // ★Phase3 v9: DEBUGボタン注入(編成ボタンの隣)
+  ensureDebugButton();
+}
+
+// ★Phase3 v9: DEBUGボタンを動的注入
+const DEBUG_MODE = true;  // 本番では false にする
+function ensureDebugButton() {
+  if (!DEBUG_MODE) return;
+  if (document.getElementById('debug-menu-btn')) return;
+
+  // 編成ボタンを探す(ID/テキストで)
+  let partyBtn = document.querySelector('[onclick*="party"]') ||
+                 document.getElementById('btn-party') ||
+                 Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '編成');
+
+  const btn = document.createElement('button');
+  btn.id = 'debug-menu-btn';
+  btn.textContent = '🛠 DEBUG';
+  btn.style.cssText = `
+    background: #6a2020; color: #fff; border: 1px solid #ff6060;
+    padding: 6px 12px; font-size: 11px; font-weight: 800;
+    border-radius: 4px; cursor: pointer; margin-left: 6px;
+    letter-spacing: 1px;
+  `;
+  btn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showDebugMenu();
+  };
+
+  if (partyBtn && partyBtn.parentNode) {
+    // 編成ボタンの直後に配置
+    partyBtn.parentNode.insertBefore(btn, partyBtn.nextSibling);
+  } else {
+    // 編成ボタンが見つからなければ、画面右上に固定配置
+    btn.style.position = 'fixed';
+    btn.style.top = '8px';
+    btn.style.right = '8px';
+    btn.style.zIndex = '9000';
+    document.body.appendChild(btn);
+  }
+}
+
+// ★Phase3 v9: DEBUGメニュー表示
+function showDebugMenu() {
+  // 既存があれば消す
+  document.querySelectorAll('.debug-menu-overlay').forEach(o => o.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'debug-menu-overlay';
+  overlay.style.cssText = `
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.85); z-index:99998;
+    display:flex; align-items:center; justify-content:center;
+    overflow-y:auto; padding:20px;
+  `;
+
+  // 全ステージのリスト
+  const allStages = Object.values(MISSIONS).map(m => ({
+    id: m.id,
+    name: m.name_ja || m.name,
+    isEvent: !!m.isEvent,
+  }));
+
+  const stageButtonsHtml = allStages.map(s =>
+    `<button class="debug-stage-btn" data-mission-id="${s.id}" style="
+      display:block; width:100%; text-align:left; padding:8px 12px;
+      background:${s.isEvent ? '#3a1a3a' : '#2a2a3a'};
+      border:1px solid ${s.isEvent ? '#a040a0' : '#4a4a6a'};
+      color:#fff; cursor:pointer; margin-bottom:4px;
+      border-radius:4px; font-size:12px;
+    ">${s.isEvent ? '⚔️' : '📍'} ${s.name} <span style="color:#888; font-size:10px;">(${s.id})</span></button>`
+  ).join('');
+
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(180deg,#2a1a1a 0%,#1a0a0a 100%);
+                border:2px solid #ff6060; border-radius:8px;
+                padding:20px; max-width:520px; width:100%;
+                max-height:90vh; overflow-y:auto;
+                box-shadow:0 0 40px rgba(255,80,80,0.4);">
+      <div style="color:#ff6060; font-size:14px; font-weight:800; margin-bottom:16px; text-align:center; letter-spacing:2px;">
+        🛠 DEBUG MENU
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        <button id="debug-unlock-all" style="flex:1; min-width:120px; padding:10px; background:#2a4a2a; border:1px solid #60a060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          全ステージ即解放
+        </button>
+        <button id="debug-strong-pt" style="flex:1; min-width:120px; padding:10px; background:#2a3a4a; border:1px solid #6090a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          強PT(Lv5×6人)
+        </button>
+        <button id="debug-keys-full" style="flex:1; min-width:120px; padding:10px; background:#4a4a2a; border:1px solid #c0c060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          鍵満タン(各3個)
+        </button>
+        <button id="debug-reset" style="flex:1; min-width:120px; padding:10px; background:#4a2a2a; border:1px solid #c06060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          ステート リセット
+        </button>
+      </div>
+
+      <div style="color:#ff8080; font-size:11px; font-weight:700; margin-bottom:8px; letter-spacing:1px;">
+        任意ステージ即挑戦
+      </div>
+      <div style="max-height:300px; overflow-y:auto; padding:4px; background:rgba(0,0,0,0.4); border-radius:4px;">
+        ${stageButtonsHtml}
+      </div>
+
+      <button id="debug-close" style="display:block; width:100%; margin-top:16px; padding:10px; background:#3a3a3a; border:1px solid #6a6a6a; color:#fff; cursor:pointer; border-radius:4px; font-size:13px; font-weight:700;">
+        閉じる
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // 閉じる
+  document.getElementById('debug-close').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  // 全解放
+  document.getElementById('debug-unlock-all').onclick = () => {
+    if (!state.available) state.available = [];
+    Object.keys(MISSIONS).forEach(id => {
+      if (!state.available.includes(id)) state.available.push(id);
+    });
+    addLogEquipToast && addLogEquipToast('🛠 全ステージ解放');
+    if (typeof renderMap === 'function') renderMap();
+    overlay.remove();
+  };
+
+  // 強PT
+  document.getElementById('debug-strong-pt').onclick = () => {
+    if (!confirm('現在のパーティを上書きします。よろしいですか?')) return;
+    state.partyData = [];
+    state.party = [];
+    const strongClasses = ['champion', 'barbarian', 'archer', 'monk', 'alchemist', 'beastmaster'];
+    strongClasses.forEach(cls => {
+      const cls_def = CLASSES[cls];
+      if (!cls_def) return;
+      const lv = 5;
+      const skills = SKILLS[cls] || [];
+      const skillLevels = {};
+      skills.forEach((_, i) => { skillLevels[i] = 1; });
+      let maxHP = cls_def.hp_base + cls_def.hp_per_level * (lv - 1);
+      if (cls_def.hp_override) maxHP = cls_def.hp_override;
+      const charName = (CHAR_NAMES[cls] && CHAR_NAMES[cls][0]) || cls;
+      state.partyData.push({
+        classKey: cls, charName: charName, level: lv,
+        hp: maxHP, maxHP: maxHP, exp: 0,
+        equipped: [], skillPoints: 3, skillLevels: skillLevels,
+        passiveLevel: 1, addedSkills: [],
+      });
+      state.party.push(cls);
+    });
+    addLogEquipToast && addLogEquipToast('🛠 強PT編成完了(Lv5×6人)');
+    overlay.remove();
+  };
+
+  // 鍵満タン
+  document.getElementById('debug-keys-full').onclick = () => {
+    state.keys = { gold: 3, blue: 3 };
+    addLogEquipToast && addLogEquipToast('🛠 鍵満タン(GOLD3 / BLUE3)');
+    if (typeof renderMap === 'function') renderMap();
+    overlay.remove();
+  };
+
+  // リセット
+  document.getElementById('debug-reset').onclick = () => {
+    if (!confirm('ステートを完全リセットします。本当によろしいですか?')) return;
+    state.cleared = [];
+    state.available = ['trivial_plain'];  // 初期解放のみ
+    state.keys = { gold: 0, blue: 0 };
+    state.clearedSubMissions = [];
+    state.chestsOpened = [];
+    state.routeFlags = {};
+    addLogEquipToast && addLogEquipToast('🛠 ステートリセット完了');
+    if (typeof renderMap === 'function') renderMap();
+    overlay.remove();
+  };
+
+  // ステージ即挑戦
+  overlay.querySelectorAll('.debug-stage-btn').forEach(btn => {
+    btn.onclick = () => {
+      const missionId = btn.getAttribute('data-mission-id');
+      const mission = MISSIONS[missionId];
+      if (!mission) return;
+      // 強制解放
+      if (!state.available) state.available = [];
+      if (!state.available.includes(missionId)) state.available.push(missionId);
+      overlay.remove();
+      // イベントなら説明モーダル、それ以外は直接戦闘
+      if (mission.isEvent) {
+        showEventModal(mission);
+      } else {
+        state.currentMission = missionId;
+        state.currentSubMissionId = null;
+        state.currentAreaBackup = null;
+        if (typeof initBattle === 'function') initBattle(missionId);
+        if (typeof goTo === 'function') goTo('battle');
+      }
+    };
+  });
 }
 
 // ★Phase3 v2: ノードタップ処理
