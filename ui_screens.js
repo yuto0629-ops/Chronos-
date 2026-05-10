@@ -273,43 +273,38 @@ function renderMap() {
   ensureDebugButton();
 }
 
-// ★Phase3 v9: DEBUGボタンを動的注入
+// ★Phase3 v9: DEBUGボタンを動的注入(画面右上に固定表示)
 const DEBUG_MODE = true;  // 本番では false にする
 function ensureDebugButton() {
   if (!DEBUG_MODE) return;
   if (document.getElementById('debug-menu-btn')) return;
 
-  // 編成ボタンを探す(ID/テキストで)
-  let partyBtn = document.querySelector('[onclick*="party"]') ||
-                 document.getElementById('btn-party') ||
-                 Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '編成');
-
   const btn = document.createElement('button');
   btn.id = 'debug-menu-btn';
   btn.textContent = '🛠 DEBUG';
   btn.style.cssText = `
-    background: #6a2020; color: #fff; border: 1px solid #ff6060;
-    padding: 6px 12px; font-size: 11px; font-weight: 800;
-    border-radius: 4px; cursor: pointer; margin-left: 6px;
-    letter-spacing: 1px;
+    position: fixed !important;
+    top: 60px !important;
+    right: 8px !important;
+    z-index: 99000 !important;
+    background: #6a2020 !important;
+    color: #fff !important;
+    border: 2px solid #ff6060 !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    letter-spacing: 1px !important;
+    box-shadow: 0 0 12px rgba(255,80,80,0.6) !important;
   `;
   btn.onclick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     showDebugMenu();
   };
-
-  if (partyBtn && partyBtn.parentNode) {
-    // 編成ボタンの直後に配置
-    partyBtn.parentNode.insertBefore(btn, partyBtn.nextSibling);
-  } else {
-    // 編成ボタンが見つからなければ、画面右上に固定配置
-    btn.style.position = 'fixed';
-    btn.style.top = '8px';
-    btn.style.right = '8px';
-    btn.style.zIndex = '9000';
-    document.body.appendChild(btn);
-  }
+  document.body.appendChild(btn);
+  console.log('[DEBUG] ボタン注入完了');
 }
 
 // ★Phase3 v9: DEBUGメニュー表示
