@@ -2979,9 +2979,10 @@ function onMissionVictory() {
     return;
   }
 
-  // ★Phase3 v9: イベントは独自フローで処理(XP画面・報酬画面なし)
+  // ★Phase3 v9: イベントは独自フローで処理
+  //   v3.11: isBossBattle=true のボスイベント(E2/E3等)は「セリフ → EXP画面 → handleEventVictory」の順に流す
   if (mission.isEvent) {
-    console.log('[onMissionVictory] イベント検出:', mission.id);
+    console.log('[onMissionVictory] イベント検出:', mission.id, 'isBossBattle:', !!mission.isBossBattle);
     // パーティHP復元
     const allyUnits = battle.units.filter(u => u.side === 'ally' && !u.isPet);
     state.partyData.forEach((pd, i) => {
@@ -2994,8 +2995,42 @@ function onMissionVictory() {
     state.partyData.forEach(pd => {
       pd.hp = pd.maxHP;
     });
-    // VICTORY表示後、handleEventVictoryへ
-    handleEventVictory(mission, 0, []);
+
+    if (mission.isBossBattle) {
+      // ★v3.11: ボス戦イベントは EXP も付与して画面表示
+      //   セリフ → showXpGainScreen → (内部で showRewardScreen) → (isEvent判定) → handleEventVictory の動線で繋がる
+      const expData = calculateExpGain(mission, allyUnits);
+      // EXPスナップショット(アニメ用、加算前の値)
+      const expSnapshots = state.partyData.map((pd, idx) => ({
+        idx,
+        classKey: pd.classKey,
+        name: pd.charName || (CLASSES[pd.classKey] && CLASSES[pd.classKey].name_ja),
+        levelBefore: pd.level,
+        expBefore: pd.exp || 0,
+        expGained: expData.perChar[idx] || 0,
+      }));
+      // EXP実加算 + LvUp判定(既存通常戦闘ルートと同じ仕様)
+      state.partyData.forEach((pd, idx) => {
+        pd.exp = (pd.exp || 0) + (expData.perChar[idx] || 0);
+        while (pd.exp >= expRequired(pd.level)) {
+          pd.exp -= expRequired(pd.level);
+          pd.level++;
+          const hpGain = HP_GAIN_PER_LV[pd.classKey] || 4;
+          pd.maxHP += hpGain;
+          pd.hp += hpGain;
+          pd.skillPoints = (pd.skillPoints || 0) + 1;
+        }
+      });
+      const expGainedTotal = Object.values(expData.perChar).reduce((a, b) => a + b, 0);
+
+      // セリフ → XP画面(終了後は内部で showRewardScreen → isEventで handleEventVictory)
+      showBossPostBattleDialog(mission, () => {
+        showXpGainScreen(mission, expGainedTotal, expSnapshots);
+      });
+    } else {
+      // 非ボスイベント(E1孤高の挑戦者など)は従来通り直行
+      handleEventVictory(mission, 0, []);
+    }
     return;
   }
 
@@ -3859,7 +3894,8 @@ function handleEventVictory(mission, expGained, levelUps) {
   }
 }
 
-// ★Phase3 v9: 加入ユニットを作成(state.partyDataフォーマット準拠)
+// ★Phase3 v9 / v3.11: 加入ユニットを作成(state.partyDataフォーマット準拠)
+//   SP配分: 原作仕様「スキルLv合計 = キャラLv + 2」に基づき、初期所持スキル数を引いた残りをSP化
 function createRecruitUnit(classKey, level, charName) {
   const cls = CLASSES[classKey];
   if (!cls) return null;
@@ -3870,6 +3906,9 @@ function createRecruitUnit(classKey, level, charName) {
   // HP計算
   let maxHP = cls.hp_base + (cls.hp_per_level * (level - 1));
   if (cls.hp_override) maxHP = cls.hp_override;
+  // SP計算: スキルLv合計 = Lv+2 をベースに、初期所持スキル分を引いた残り
+  const totalSkillLv = level + 2;
+  const skillPoints = Math.max(0, totalSkillLv - skills.length);
   return {
     classKey: classKey,
     charName: charName,
@@ -3878,7 +3917,7 @@ function createRecruitUnit(classKey, level, charName) {
     maxHP: maxHP,
     exp: 0,
     equipped: [],          // ★既存仕様: equipped(配列)
-    skillPoints: 0,
+    skillPoints: skillPoints,
     skillLevels: skillLevels,
     passiveLevel: 1,       // ★必須: passiveLevel
     addedSkills: [],
