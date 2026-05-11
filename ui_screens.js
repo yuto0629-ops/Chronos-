@@ -358,10 +358,10 @@ function showDebugMenu() {
           全ステージ即解放
         </button>
         <button id="debug-monk-lv5" style="flex:1; min-width:120px; padding:10px; background:#2a3a4a; border:1px solid #6090a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
-          モンク Lv5×4人
+          ＋モンク Lv5×4人
         </button>
         <button id="debug-monk-lv9" style="flex:1; min-width:120px; padding:10px; background:#3a2a4a; border:1px solid #9060a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
-          モンク Lv9×4人
+          ＋モンク Lv9×4人
         </button>
         <button id="debug-keys-full" style="flex:1; min-width:120px; padding:10px; background:#4a4a2a; border:1px solid #c0c060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           鍵満タン(各3個)
@@ -403,11 +403,18 @@ function showDebugMenu() {
     overlay.remove();
   };
 
-  // 強PT(モンク×4): Lv5/Lv9で共通処理
+  // 強PT(モンク×4追加): 初期PTを保持してモンクを4人追加 → 計6人パーティ
   function makeMonkParty(lv) {
-    if (!confirm(`現在のパーティを モンク Lv${lv}×4人 に上書きします。よろしいですか?`)) return;
-    state.partyData = [];
-    state.party = [];
+    if (!confirm(`現在のパーティの先頭2人(初期PT)を保持し、モンクLv${lv}×4人を追加します(計6人)。よろしいですか?`)) return;
+
+    // ★初期PTの2人だけ残す(それ以外をクレンジング、過去のバグで混入した錬金術師等を排除)
+    if (state.partyData.length > 2) {
+      state.partyData = state.partyData.slice(0, 2);
+    }
+    if (state.party.length > 2) {
+      state.party = state.party.slice(0, 2);
+    }
+
     const cls = 'monk';
     const cls_def = CLASSES[cls];
     if (!cls_def) {
@@ -419,13 +426,26 @@ function showDebugMenu() {
     const totalSkillLv = lv + 2;
     const initialSkillCount = skills.length;
     const skillPoints = Math.max(0, totalSkillLv - initialSkillCount);
+
+    // 既存パーティで使ってる名前を避けるため取得
+    const usedNames = state.partyData.map(p => p.charName).filter(Boolean);
+    const namesPool = (CHAR_NAMES[cls] || [cls]);
+
     for (let i = 0; i < 4; i++) {
       const skillLevels = {};
       skills.forEach((_, idx) => { skillLevels[idx] = 1; });
       let maxHP = cls_def.hp_base + cls_def.hp_per_level * (lv - 1);
       if (cls_def.hp_override) maxHP = cls_def.hp_override;
-      const namesPool = (CHAR_NAMES[cls] || [cls]);
-      const charName = namesPool[i % namesPool.length] + (i >= namesPool.length ? `(${i+1})` : '');
+
+      // 名前重複回避(初期PTにもモンクいる可能性あり)
+      let charName = namesPool[i % namesPool.length];
+      let n = 2;
+      while (usedNames.includes(charName)) {
+        charName = `${namesPool[i % namesPool.length]}(${n})`;
+        n++;
+      }
+      usedNames.push(charName);
+
       state.partyData.push({
         classKey: cls, charName: charName, level: lv,
         hp: maxHP, maxHP: maxHP, exp: 0,
@@ -434,7 +454,7 @@ function showDebugMenu() {
       });
       state.party.push(cls);
     }
-    addLogEquipToast && addLogEquipToast(`🛠 モンク Lv${lv}×4人 編成完了`);
+    addLogEquipToast && addLogEquipToast(`🛠 モンク Lv${lv}×4人 追加(計${state.partyData.length}人)`);
     overlay.remove();
   }
 
