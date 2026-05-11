@@ -212,6 +212,8 @@ function applyEquipment(unit, equippedKeys) {
     hpRegen: 0,
     stRegen: 0,
     waitHP: 0,
+    waitAtkBuffs: [], // ★Phase 5.2a: [{amount:2, turns:3}, ...] 待機時に付与する攻撃バフ
+    waitAoeST: 0,     // ★Phase 5.2a: 待機時に隣接味方ST回復(Pitcher of Ale)
     aoeHeal: 0,
     armor: [0, 0, 0],
   };
@@ -241,6 +243,8 @@ function applyEquipment(unit, equippedKeys) {
     if (s.hp_regen)   unit.equipBonuses.hpRegen += s.hp_regen;
     if (s.st_regen)   unit.equipBonuses.stRegen += s.st_regen;
     if (s.wait_hp)    unit.equipBonuses.waitHP += s.wait_hp;
+    if (s.wait_atk_buff) unit.equipBonuses.waitAtkBuffs.push({...s.wait_atk_buff}); // ★Phase 5.2a
+    if (s.wait_aoe_st)   unit.equipBonuses.waitAoeST += s.wait_aoe_st;              // ★Phase 5.2a
     if (s.aoe_heal)   unit.equipBonuses.aoeHeal += s.aoe_heal;
   });
 }
@@ -793,6 +797,8 @@ function renderCharStats(pd) {
   let allDmg = 0, singleDmg = 0, critBonus = 0;
   let meleeDmg = 0, rangedDmg = 0;  // ★Phase 5.1
   let hpRegen = 0, stRegen = 0, waitHp = 0, aoeHeal = 0;
+  let waitAtkBuffs = []; // ★Phase 5.2a [{amount, turns}, ...]
+  let waitAoeST = 0;     // ★Phase 5.2a
 
   (pd.equipped || []).forEach(key => {
     const item = ITEMS[key];
@@ -809,6 +815,8 @@ function renderCharStats(pd) {
     if (s.hp_regen) hpRegen += s.hp_regen;
     if (s.st_regen) stRegen += s.st_regen;
     if (s.wait_hp) waitHp += s.wait_hp;
+    if (s.wait_atk_buff) waitAtkBuffs.push(s.wait_atk_buff);  // ★Phase 5.2a
+    if (s.wait_aoe_st) waitAoeST += s.wait_aoe_st;            // ★Phase 5.2a
     if (s.aoe_heal) aoeHeal += s.aoe_heal;
   });
 
@@ -887,6 +895,12 @@ function renderCharStats(pd) {
   if (hpRegen > 0) bonusParts.push(`HP再生+${hpRegen}/T`);
   if (stRegen > 0) bonusParts.push(`ST再生+${stRegen}/T`);
   if (waitHp > 0) bonusParts.push(`待機HP+${waitHp}`);
+  if (waitAtkBuffs.length > 0) {
+    const totalAmount = waitAtkBuffs.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const maxTurns = Math.max(...waitAtkBuffs.map(b => b.turns || 0));
+    bonusParts.push(`待機攻撃+${totalAmount}(${maxTurns}T)`);
+  }
+  if (waitAoeST > 0) bonusParts.push(`待機隣接ST+${waitAoeST}`);
   if (aoeHeal > 0) bonusParts.push(`隣接回復+${aoeHeal}/T`);
 
   const bonusHTML = bonusParts.length > 0
@@ -2264,9 +2278,13 @@ function executeSkill(attacker, tx, ty, targetUnit, targetCrate) {
 function applyDamage(attacker, target, skill) {
   // Daze状態だとCrit無効
   const isDazed = target.statuses.some(s => s.type === 'daze');
-  // 攻撃側のbuff_atk
+  // 攻撃側のbuff_atk(スキル由来、+5固定)
   const atkBuff = attacker.statuses.filter(s => s.type === 'buff_atk').length;
-  const atkBoost = atkBuff * 5; // バフ1個につき+5
+  let atkBoost = atkBuff * 5; // バフ1個につき+5
+  // ★Phase 5.2a: 待機アイテム由来のequip_atk_buff(amount保持型、複数重複可)
+  attacker.statuses.filter(s => s.type === 'equip_atk_buff').forEach(s => {
+    atkBoost += (s.amount || 0);
+  });
 
   // 防御計算: 対応軸 - armor_down状態の効果
   const armorIdx = skill.type === 'M' ? 0 : (skill.type === 'R' ? 1 : 2);
@@ -4925,6 +4943,38 @@ function actionWait() {
     if (actualHeal > 0) {
       showHealPopup(u, actualHeal);
       addLog(`<span style="color:#6ec844">${u.name} 待機でHP+${actualHeal}回復</span>`);
+    }
+  }
+
+  // ★Phase 5.2a: その場待機時のwait_atk_buff発動(Drumstick/Steak/Chicken/Meat Pie)
+  if (!u.hasMoved && !u.hasDashed && !u.dead && u.equipBonuses && u.equipBonuses.waitAtkBuffs && u.equipBonuses.waitAtkBuffs.length > 0) {
+    u.equipBonuses.waitAtkBuffs.forEach(buf => {
+      u.statuses.push({
+        type: 'equip_atk_buff',
+        amount: buf.amount,
+        turns: buf.turns,
+      });
+    });
+    const total = u.equipBonuses.waitAtkBuffs.reduce((sum, b) => sum + (b.amount || 0), 0);
+    addLog(`<span style="color:#ffaa44">${u.name} 待機で攻撃力+${total}!</span>`);
+  }
+
+  // ★Phase 5.2a: その場待機時のwait_aoe_st(Pitcher of Ale)
+  if (!u.hasMoved && !u.hasDashed && !u.dead && u.equipBonuses && u.equipBonuses.waitAoeST > 0) {
+    const amount = u.equipBonuses.waitAoeST;
+    const adjacent = battle.units.filter(o =>
+      !o.dead && o.side === u.side && o.id !== u.id &&
+      Math.abs(o.x - u.x) <= 1 && Math.abs(o.y - u.y) <= 1
+    );
+    let recovered = 0;
+    adjacent.forEach(a => {
+      if (a.st < a.maxST) {
+        a.st = Math.min(a.maxST, a.st + amount);
+        recovered++;
+      }
+    });
+    if (recovered > 0) {
+      addLog(`<span style="color:#88ddff">${u.name} 隣接味方${recovered}人のSTを+${amount}回復</span>`);
     }
   }
 
