@@ -273,38 +273,43 @@ function renderMap() {
   ensureDebugButton();
 }
 
-// ★Phase3 v9: DEBUGボタンを動的注入(画面右上に固定表示)
+// ★Phase3 v9: DEBUGボタンを動的注入
 const DEBUG_MODE = true;  // 本番では false にする
 function ensureDebugButton() {
   if (!DEBUG_MODE) return;
   if (document.getElementById('debug-menu-btn')) return;
 
+  // 編成ボタンを探す(ID/テキストで)
+  let partyBtn = document.querySelector('[onclick*="party"]') ||
+                 document.getElementById('btn-party') ||
+                 Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '編成');
+
   const btn = document.createElement('button');
   btn.id = 'debug-menu-btn';
   btn.textContent = '🛠 DEBUG';
   btn.style.cssText = `
-    position: fixed !important;
-    top: 60px !important;
-    right: 8px !important;
-    z-index: 99000 !important;
-    background: #6a2020 !important;
-    color: #fff !important;
-    border: 2px solid #ff6060 !important;
-    padding: 8px 14px !important;
-    font-size: 12px !important;
-    font-weight: 800 !important;
-    border-radius: 4px !important;
-    cursor: pointer !important;
-    letter-spacing: 1px !important;
-    box-shadow: 0 0 12px rgba(255,80,80,0.6) !important;
+    background: #6a2020; color: #fff; border: 1px solid #ff6060;
+    padding: 6px 12px; font-size: 11px; font-weight: 800;
+    border-radius: 4px; cursor: pointer; margin-left: 6px;
+    letter-spacing: 1px;
   `;
   btn.onclick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     showDebugMenu();
   };
-  document.body.appendChild(btn);
-  console.log('[DEBUG] ボタン注入完了');
+
+  if (partyBtn && partyBtn.parentNode) {
+    // 編成ボタンの直後に配置
+    partyBtn.parentNode.insertBefore(btn, partyBtn.nextSibling);
+  } else {
+    // 編成ボタンが見つからなければ、画面右上に固定配置
+    btn.style.position = 'fixed';
+    btn.style.top = '8px';
+    btn.style.right = '8px';
+    btn.style.zIndex = '9000';
+    document.body.appendChild(btn);
+  }
 }
 
 // ★Phase3 v9: DEBUGメニュー表示
@@ -352,11 +357,11 @@ function showDebugMenu() {
         <button id="debug-unlock-all" style="flex:1; min-width:120px; padding:10px; background:#2a4a2a; border:1px solid #60a060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           全ステージ即解放
         </button>
-        <button id="debug-strong-pt-5" style="flex:1; min-width:120px; padding:10px; background:#2a3a4a; border:1px solid #6090a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
-          強PT(Lv5×6人)
+        <button id="debug-monk-lv5" style="flex:1; min-width:120px; padding:10px; background:#2a3a4a; border:1px solid #6090a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          モンク Lv5×4人
         </button>
-        <button id="debug-strong-pt-9" style="flex:1; min-width:120px; padding:10px; background:#3a2a4a; border:1px solid #a060c0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
-          強PT(Lv9×6人)
+        <button id="debug-monk-lv9" style="flex:1; min-width:120px; padding:10px; background:#3a2a4a; border:1px solid #9060a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          モンク Lv9×4人
         </button>
         <button id="debug-keys-full" style="flex:1; min-width:120px; padding:10px; background:#4a4a2a; border:1px solid #c0c060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           鍵満タン(各3個)
@@ -387,7 +392,7 @@ function showDebugMenu() {
     if (e.target === overlay) overlay.remove();
   });
 
-  // 全解放(★メニュー閉じない、連続適用OK)
+  // 全解放
   document.getElementById('debug-unlock-all').onclick = () => {
     if (!state.available) state.available = [];
     Object.keys(MISSIONS).forEach(id => {
@@ -395,51 +400,60 @@ function showDebugMenu() {
     });
     addLogEquipToast && addLogEquipToast('🛠 全ステージ解放');
     if (typeof renderMap === 'function') renderMap();
+    overlay.remove();
   };
 
-  // 強PT Lv5(★メニュー閉じない)
-  const buildStrongPT = (lv) => {
-    if (!confirm(`現在のパーティを Lv${lv}×6人 で上書きします。よろしいですか?`)) return;
+  // 強PT(モンク×4): Lv5/Lv9で共通処理
+  function makeMonkParty(lv) {
+    if (!confirm(`現在のパーティを モンク Lv${lv}×4人 に上書きします。よろしいですか?`)) return;
     state.partyData = [];
     state.party = [];
-    const strongClasses = ['champion', 'barbarian', 'archer', 'monk', 'alchemist', 'beastmaster'];
-    strongClasses.forEach(cls => {
-      const cls_def = CLASSES[cls];
-      if (!cls_def) return;
-      const skills = SKILLS[cls] || [];
+    const cls = 'monk';
+    const cls_def = CLASSES[cls];
+    if (!cls_def) {
+      alert('monk クラスが見つかりません');
+      return;
+    }
+    const skills = SKILLS[cls] || [];
+    // SP配分: 仲間スキルLv合計 = キャラLv + 2 をベースに、所持スキル分を引いた残りをSP化
+    const totalSkillLv = lv + 2;
+    const initialSkillCount = skills.length;
+    const skillPoints = Math.max(0, totalSkillLv - initialSkillCount);
+    for (let i = 0; i < 4; i++) {
       const skillLevels = {};
-      // Lvに応じてスキルレベルも調整(Lv9なら一部Lv3〜4)
-      skills.forEach((_, i) => {
-        skillLevels[i] = lv >= 9 ? Math.min(Math.floor(lv / 3), 5) : 1;
-      });
+      skills.forEach((_, idx) => { skillLevels[idx] = 1; });
       let maxHP = cls_def.hp_base + cls_def.hp_per_level * (lv - 1);
       if (cls_def.hp_override) maxHP = cls_def.hp_override;
-      const charName = (CHAR_NAMES[cls] && CHAR_NAMES[cls][0]) || cls;
+      const namesPool = (CHAR_NAMES[cls] || [cls]);
+      const charName = namesPool[i % namesPool.length] + (i >= namesPool.length ? `(${i+1})` : '');
       state.partyData.push({
         classKey: cls, charName: charName, level: lv,
         hp: maxHP, maxHP: maxHP, exp: 0,
-        equipped: [], skillPoints: lv >= 9 ? 8 : 3, skillLevels: skillLevels,
-        passiveLevel: lv >= 9 ? 3 : 1, addedSkills: [],
+        equipped: [], skillPoints: skillPoints, skillLevels: skillLevels,
+        passiveLevel: 1, addedSkills: [],
       });
       state.party.push(cls);
-    });
-    addLogEquipToast && addLogEquipToast(`🛠 強PT編成完了(Lv${lv}×6人)`);
-  };
-  document.getElementById('debug-strong-pt-5').onclick = () => buildStrongPT(5);
-  document.getElementById('debug-strong-pt-9').onclick = () => buildStrongPT(9);
+    }
+    addLogEquipToast && addLogEquipToast(`🛠 モンク Lv${lv}×4人 編成完了`);
+    overlay.remove();
+  }
 
-  // 鍵満タン(★メニュー閉じない)
+  document.getElementById('debug-monk-lv5').onclick = () => makeMonkParty(5);
+  document.getElementById('debug-monk-lv9').onclick = () => makeMonkParty(9);
+
+  // 鍵満タン
   document.getElementById('debug-keys-full').onclick = () => {
     state.keys = { gold: 3, blue: 3 };
     addLogEquipToast && addLogEquipToast('🛠 鍵満タン(GOLD3 / BLUE3)');
     if (typeof renderMap === 'function') renderMap();
+    overlay.remove();
   };
 
-  // リセット(これは閉じる)
+  // リセット
   document.getElementById('debug-reset').onclick = () => {
     if (!confirm('ステートを完全リセットします。本当によろしいですか?')) return;
     state.cleared = [];
-    state.available = ['trivial_plain'];
+    state.available = ['trivial_plain'];  // 初期解放のみ
     state.keys = { gold: 0, blue: 0 };
     state.clearedSubMissions = [];
     state.chestsOpened = [];
