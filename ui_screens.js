@@ -404,6 +404,7 @@ function showDebugMenu() {
   };
 
   // 強PT(モンク×4追加): 初期PTを保持してモンクを4人追加 → 計6人パーティ
+  // ★SP配分: 全スキルに均等めに振り分けて渡す(SP=0、ユーザ操作不要)
   function makeMonkParty(lv) {
     if (!confirm(`現在のパーティの先頭2人(初期PT)を保持し、モンクLv${lv}×4人を追加します(計6人)。よろしいですか?`)) return;
 
@@ -422,18 +423,28 @@ function showDebugMenu() {
       return;
     }
     const skills = SKILLS[cls] || [];
-    // SP配分: 仲間スキルLv合計 = キャラLv + 2 をベースに、所持スキル分を引いた残りをSP化
+    const skillCount = skills.length;
+
+    // スキルLv合計 = Lv + 2 を全スキルに均等めに配分
+    // 例: Lv5(合計7)・3スキル → {0:3, 1:2, 2:2}
+    //     Lv9(合計11)・3スキル → {0:4, 1:4, 2:3}
     const totalSkillLv = lv + 2;
-    const initialSkillCount = skills.length;
-    const skillPoints = Math.max(0, totalSkillLv - initialSkillCount);
+    function buildSkillLevels() {
+      const baseLv = Math.floor(totalSkillLv / skillCount);
+      const remainder = totalSkillLv - (baseLv * skillCount);
+      const sl = {};
+      for (let idx = 0; idx < skillCount; idx++) {
+        sl[idx] = baseLv + (idx < remainder ? 1 : 0);
+      }
+      return sl;
+    }
 
     // 既存パーティで使ってる名前を避けるため取得
     const usedNames = state.partyData.map(p => p.charName).filter(Boolean);
     const namesPool = (CHAR_NAMES[cls] || [cls]);
 
     for (let i = 0; i < 4; i++) {
-      const skillLevels = {};
-      skills.forEach((_, idx) => { skillLevels[idx] = 1; });
+      const skillLevels = buildSkillLevels();
       let maxHP = cls_def.hp_base + cls_def.hp_per_level * (lv - 1);
       if (cls_def.hp_override) maxHP = cls_def.hp_override;
 
@@ -449,7 +460,7 @@ function showDebugMenu() {
       state.partyData.push({
         classKey: cls, charName: charName, level: lv,
         hp: maxHP, maxHP: maxHP, exp: 0,
-        equipped: [], skillPoints: skillPoints, skillLevels: skillLevels,
+        equipped: [], skillPoints: 0, skillLevels: skillLevels,
         passiveLevel: 1, addedSkills: [],
       });
       state.party.push(cls);
