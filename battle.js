@@ -351,14 +351,25 @@ function initBattle(missionId) {
   const partyToBattle = state.partyData.slice(0, maxAlly);
 
   // 味方配置(画面左端)+ partyDataからHP/装備復元
+  // ★6人対応: 5人目以降はx=0列に折り返す(BATTLE_H=10 制約のため y=2,4,6,8 まで)
   partyToBattle.forEach((pd, i) => {
+    // i=0..3 → x=1, y=2+i*2 (y=2,4,6,8)
+    // i=4..5 → x=0, y=2+(i-4)*2 (y=2,4)
+    let ax, ay;
+    if (i < 4) {
+      ax = 1;
+      ay = 2 + i * 2;
+    } else {
+      ax = 0;
+      ay = 2 + (i - 4) * 2;
+    }
     const unit = makeUnit({
       id: 'ally_' + i,
       classKey: pd.classKey,
       side: 'ally',
       level: pd.level,
-      x: 1,
-      y: 2 + i * 2,
+      x: ax,
+      y: ay,
       charName: pd.charName,
     });
     // ★B-3,B-4: partyIdx記録(EXP分配で本人特定に使う)
