@@ -366,6 +366,9 @@ function showDebugMenu() {
         <button id="debug-keys-full" style="flex:1; min-width:120px; padding:10px; background:#4a4a2a; border:1px solid #c0c060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           鍵満タン(各3個)
         </button>
+        <button id="debug-item-picker" style="flex:1; min-width:120px; padding:10px; background:#4a2a4a; border:1px solid #c060c0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          🎁 アイテム獲得
+        </button>
         <button id="debug-reset" style="flex:1; min-width:120px; padding:10px; background:#4a2a2a; border:1px solid #c06060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           ステート リセット
         </button>
@@ -408,37 +411,12 @@ function showDebugMenu() {
   function makeMonkParty(lv) {
     if (!confirm(`現在のパーティの先頭2人(初期PT)を保持し、モンクLv${lv}×4人を追加します(計6人)。よろしいですか?`)) return;
 
-    // ★クレンジング強化: STARTER_PARTIES の正規初期メンバー以外を全排除
-    //   (alchemist 等が誤って紛れ込んでた場合も確実に除去できる)
-    const validStarterClasses = new Set();
-    Object.values(STARTER_PARTIES || {}).forEach(pt => {
-      (pt.members || []).forEach(cls => validStarterClasses.add(cls));
-    });
-    // 正規クラスのキャラだけフィルタ
-    state.partyData = (state.partyData || []).filter(pd => validStarterClasses.has(pd.classKey));
-    state.party = (state.party || []).filter(cls => validStarterClasses.has(cls));
-    // 先頭2人だけ残す
-    if (state.partyData.length > 2) state.partyData = state.partyData.slice(0, 2);
-    if (state.party.length > 2) state.party = state.party.slice(0, 2);
-    // ★万一空になった場合の保険: チャンピオン+バーバリアンを初期PTとして補填
-    if (state.partyData.length === 0) {
-      ['champion', 'barbarian'].forEach((cls, i) => {
-        const cd = CLASSES[cls];
-        if (!cd) return;
-        let mh = cd.hp_base + cd.hp_per_level * 0;
-        if (cd.hp_override) mh = cd.hp_override;
-        const sk = SKILLS[cls] || [];
-        const sl = {};
-        sk.forEach((_, idx) => { sl[idx] = 1; });
-        const namesPool2 = (CHAR_NAMES[cls] || [cls]);
-        state.partyData.push({
-          classKey: cls, charName: namesPool2[0] || cls, level: 1,
-          hp: mh, maxHP: mh, exp: 0,
-          equipped: [], skillPoints: 0, skillLevels: sl,
-          passiveLevel: 1, addedSkills: [],
-        });
-        state.party.push(cls);
-      });
+    // ★初期PTの2人だけ残す(それ以外をクレンジング、過去のバグで混入した錬金術師等を排除)
+    if (state.partyData.length > 2) {
+      state.partyData = state.partyData.slice(0, 2);
+    }
+    if (state.party.length > 2) {
+      state.party = state.party.slice(0, 2);
     }
 
     const cls = 'monk';
@@ -503,6 +481,12 @@ function showDebugMenu() {
     addLogEquipToast && addLogEquipToast('🛠 鍵満タン(GOLD3 / BLUE3)');
     if (typeof renderMap === 'function') renderMap();
     overlay.remove();
+  };
+
+  // ★Phase 5.2a: アイテム獲得ピッカー
+  document.getElementById('debug-item-picker').onclick = () => {
+    overlay.remove();
+    showDebugItemPicker();
   };
 
   // リセット
@@ -1684,3 +1668,164 @@ function acceptSelectedMission() {
 
 
 renderPartyOptions();
+
+// ====== ★Phase 5.2a: DEBUG用 アイテム獲得ピッカー ======
+function showDebugItemPicker(filterColor = 'all', filterValue = 'all') {
+  // 既存削除
+  document.querySelectorAll('.debug-item-picker-overlay').forEach(o => o.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'debug-item-picker-overlay';
+  overlay.style.cssText = `
+    position:fixed; top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.85); z-index:9998;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  `;
+
+  // アイテムリスト生成
+  const allKeys = Object.keys(ITEMS);
+  const filtered = allKeys.filter(k => {
+    const it = ITEMS[k];
+    if (filterColor !== 'all' && it.color !== filterColor) return false;
+    if (filterValue !== 'all' && it.value !== parseInt(filterValue)) return false;
+    return true;
+  });
+
+  // value昇順、色グループ順でソート
+  const colorOrder = { orange: 0, blue: 1, pink: 2 };
+  filtered.sort((a, b) => {
+    const ia = ITEMS[a], ib = ITEMS[b];
+    if (ia.value !== ib.value) return ia.value - ib.value;
+    return colorOrder[ia.color] - colorOrder[ib.color];
+  });
+
+  const itemCardsHtml = filtered.map(key => {
+    const it = ITEMS[key];
+    const colorBg = { orange: '#5a3a1a', blue: '#1a3a5a', pink: '#5a1a4a' }[it.color];
+    const colorBorder = { orange: '#d4a020', blue: '#60a0d4', pink: '#d460a0' }[it.color];
+    const icon = it.color === 'orange' ? '🍞' : (it.color === 'blue' ? '🛡' : '✨');
+    return `
+      <div class="debug-item-card" data-key="${key}" style="
+        background:${colorBg}; border:1px solid ${colorBorder};
+        padding:8px; border-radius:4px; cursor:pointer;
+        display:flex; flex-direction:column; gap:4px;
+        min-width:140px; max-width:160px;
+      ">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <span style="font-size:16px;">${icon}</span>
+          <span style="font-size:9px; color:#d4a020; font-weight:700;">★V${it.value}</span>
+        </div>
+        <div style="font-size:11px; font-weight:700; color:#fff;">${it.name_ja}</div>
+        <div style="font-size:9px; color:#d4c5a9; line-height:1.3;">${it.effect}</div>
+      </div>
+    `;
+  }).join('');
+
+  // フィルタボタン
+  const colorFilterBtn = (key, label, bg) => `
+    <button data-filter-color="${key}" style="
+      padding:6px 10px; background:${filterColor === key ? bg : '#3a3a3a'};
+      border:1px solid ${filterColor === key ? '#fff' : '#666'};
+      color:#fff; cursor:pointer; border-radius:3px; font-size:11px;
+    ">${label}</button>
+  `;
+  const valueFilterBtn = (val, label) => `
+    <button data-filter-value="${val}" style="
+      padding:6px 10px; background:${String(filterValue) === String(val) ? '#5a4a2a' : '#3a3a3a'};
+      border:1px solid ${String(filterValue) === String(val) ? '#d4a020' : '#666'};
+      color:#fff; cursor:pointer; border-radius:3px; font-size:11px;
+    ">${label}</button>
+  `;
+
+  overlay.innerHTML = `
+    <div style="background:#1a1a1a; border:2px solid #c060c0; border-radius:8px;
+                padding:20px; max-width:900px; width:100%;
+                max-height:90vh; overflow-y:auto;
+                box-shadow:0 0 40px rgba(192,96,192,0.4);">
+      <div style="color:#ff60ff; font-size:14px; font-weight:800; margin-bottom:12px; text-align:center; letter-spacing:2px;">
+        🎁 DEBUG: アイテム獲得
+      </div>
+      <div style="font-size:10px; color:#a8956e; margin-bottom:12px; text-align:center;">
+        アイテムをタップでインベントリに追加。フィルタで絞り込み可能。
+      </div>
+
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; align-items:center;">
+        <span style="font-size:10px; color:#888; min-width:30px;">色:</span>
+        ${colorFilterBtn('all', '全', '#666')}
+        ${colorFilterBtn('orange', '🍞', '#a05a20')}
+        ${colorFilterBtn('blue', '🛡', '#205aa0')}
+        ${colorFilterBtn('pink', '✨', '#a02080')}
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">
+        <span style="font-size:10px; color:#888; min-width:30px;">価値:</span>
+        ${valueFilterBtn('all', '全')}
+        ${valueFilterBtn('1', '★V1')}
+        ${valueFilterBtn('2', '★V2')}
+        ${valueFilterBtn('3', '★V3')}
+        ${valueFilterBtn('4', '★V4')}
+      </div>
+
+      <div style="font-size:10px; color:#888; margin-bottom:8px;">
+        ${filtered.length}個 / 全${allKeys.length}個
+      </div>
+
+      <div id="debug-item-grid" style="
+        display:grid; gap:8px;
+        grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+        max-height:55vh; overflow-y:auto;
+        padding:4px; background:rgba(0,0,0,0.4); border-radius:4px;
+      ">
+        ${itemCardsHtml}
+      </div>
+
+      <button id="debug-item-picker-close" style="
+        display:block; width:100%; margin-top:16px; padding:10px;
+        background:#3a3a3a; border:1px solid #6a6a6a; color:#fff;
+        cursor:pointer; border-radius:4px; font-size:13px; font-weight:700;
+      ">閉じる</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // 閉じる
+  document.getElementById('debug-item-picker-close').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  // 色フィルタ
+  overlay.querySelectorAll('[data-filter-color]').forEach(btn => {
+    btn.onclick = () => {
+      overlay.remove();
+      showDebugItemPicker(btn.dataset.filterColor, filterValue);
+    };
+  });
+
+  // 価値フィルタ
+  overlay.querySelectorAll('[data-filter-value]').forEach(btn => {
+    btn.onclick = () => {
+      overlay.remove();
+      showDebugItemPicker(filterColor, btn.dataset.filterValue);
+    };
+  });
+
+  // アイテムタップで追加
+  overlay.querySelectorAll('.debug-item-card').forEach(card => {
+    card.onclick = () => {
+      const key = card.dataset.key;
+      if (!state.inventory) state.inventory = [];
+      state.inventory.push(key);
+      const it = ITEMS[key];
+      // タップフィードバック
+      card.style.background = '#2a5a2a';
+      card.style.borderColor = '#60c060';
+      setTimeout(() => {
+        card.style.background = { orange: '#5a3a1a', blue: '#1a3a5a', pink: '#5a1a4a' }[it.color];
+        card.style.borderColor = { orange: '#d4a020', blue: '#60a0d4', pink: '#d460a0' }[it.color];
+      }, 400);
+      if (typeof addLogEquipToast === 'function') {
+        addLogEquipToast(`🎁 ${it.name_ja} を入手!`);
+      }
+    };
+  });
+}
