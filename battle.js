@@ -215,6 +215,9 @@ function applyEquipment(unit, equippedKeys) {
     waitAtkBuffs: [], // ★Phase 5.2a: [{amount:2, turns:3}, ...] 待機時に付与する攻撃バフ
     waitAoeST: 0,     // ★Phase 5.2a: 待機時に隣接味方ST回復(Pitcher of Ale)
     aoeHeal: 0,
+    statusResist: 0,  // ★Phase 5.2c-1: Stun/Daze/Slow 無効率(%)
+    poisonResist: 0,  // ★Phase 5.2c-1: 毒 無効率(%)
+    critResist: 0,    // ★Phase 5.2c-1: 被Crit 無効率(%)
     armor: [0, 0, 0],
   };
 
@@ -246,6 +249,9 @@ function applyEquipment(unit, equippedKeys) {
     if (s.wait_atk_buff) unit.equipBonuses.waitAtkBuffs.push({key, ...s.wait_atk_buff}); // ★Phase 5.2a: keyで識別
     if (s.wait_aoe_st)   unit.equipBonuses.waitAoeST += s.wait_aoe_st;              // ★Phase 5.2a
     if (s.aoe_heal)   unit.equipBonuses.aoeHeal += s.aoe_heal;
+    if (s.status_resist) unit.equipBonuses.statusResist += s.status_resist; // ★Phase 5.2c-1
+    if (s.poison_resist) unit.equipBonuses.poisonResist += s.poison_resist; // ★Phase 5.2c-1
+    if (s.crit_resist)   unit.equipBonuses.critResist += s.crit_resist;     // ★Phase 5.2c-1
   });
 }
 
@@ -799,6 +805,7 @@ function renderCharStats(pd) {
   let hpRegen = 0, stRegen = 0, waitHp = 0, aoeHeal = 0;
   let waitAtkBuffs = []; // ★Phase 5.2a [{amount, turns}, ...]
   let waitAoeST = 0;     // ★Phase 5.2a
+  let statusResist = 0, poisonResist = 0, critResist = 0; // ★Phase 5.2c-1
 
   (pd.equipped || []).forEach(key => {
     const item = ITEMS[key];
@@ -818,6 +825,9 @@ function renderCharStats(pd) {
     if (s.wait_atk_buff) waitAtkBuffs.push(s.wait_atk_buff);  // ★Phase 5.2a
     if (s.wait_aoe_st) waitAoeST += s.wait_aoe_st;            // ★Phase 5.2a
     if (s.aoe_heal) aoeHeal += s.aoe_heal;
+    if (s.status_resist) statusResist += s.status_resist;     // ★Phase 5.2c-1
+    if (s.poison_resist) poisonResist += s.poison_resist;     // ★Phase 5.2c-1
+    if (s.crit_resist) critResist += s.crit_resist;           // ★Phase 5.2c-1
   });
 
   // パッシブのarmorBonus
@@ -902,6 +912,9 @@ function renderCharStats(pd) {
   }
   if (waitAoeST > 0) bonusParts.push(`待機隣接ST+${waitAoeST}`);
   if (aoeHeal > 0) bonusParts.push(`隣接回復+${aoeHeal}/T`);
+  if (statusResist > 0) bonusParts.push(`異常耐性${Math.min(100, statusResist)}%`);  // ★Phase 5.2c-1
+  if (poisonResist > 0) bonusParts.push(`毒耐性${Math.min(100, poisonResist)}%`);    // ★Phase 5.2c-1
+  if (critResist > 0) bonusParts.push(`Crit耐性${Math.min(100, critResist)}%`);      // ★Phase 5.2c-1
 
   const bonusHTML = bonusParts.length > 0
     ? `<div class="char-stats-bonus">⚡ ${bonusParts.join(' / ')}</div>`
@@ -1621,6 +1634,9 @@ function showUnitStatusPopup(u) {
     }
     if (eb.waitAoeST > 0) parts.push(`待機隣接ST+${eb.waitAoeST}`); // ★Phase 5.2a
     if (eb.aoeHeal > 0) parts.push(`隣接回復+${eb.aoeHeal}/T`);     // ★Phase 5.1
+    if (eb.statusResist > 0) parts.push(`異常耐性${Math.min(100, eb.statusResist)}%`);  // ★Phase 5.2c-1
+    if (eb.poisonResist > 0) parts.push(`毒耐性${Math.min(100, eb.poisonResist)}%`);    // ★Phase 5.2c-1
+    if (eb.critResist > 0) parts.push(`Crit耐性${Math.min(100, eb.critResist)}%`);      // ★Phase 5.2c-1
     if (parts.length > 0) {
       equipInfo = `<div class="usp-equip">⚡ ${parts.join(' / ')}</div>`;
     }
@@ -2393,7 +2409,15 @@ function applyDamage(attacker, target, skill) {
 
   const finalCrit = Math.min(95, effectiveCrit + equipCritBonus + skillLvCritBonus);  // ★Crit上限95%
   for (let i = 0; i < skill.hits; i++) {
-    const isCrit = !isDazed && Math.random() * 100 < finalCrit;
+    let isCrit = !isDazed && Math.random() * 100 < finalCrit;
+    // ★Phase 5.2c-1: 被Crit耐性(熟練の書など)
+    if (isCrit && target.equipBonuses && target.equipBonuses.critResist > 0) {
+      if (Math.random() * 100 < target.equipBonuses.critResist) {
+        isCrit = false;
+        // ログは1ヒット目のみ(うるさいので)
+        if (i === 0) addLog(`<span style="color:#88ddff">${target.name} は装備の効果でCritを無効化!</span>`);
+      }
+    }
     if (isCrit) critCount++;
     let baseDamage = (skill.damage + atkBoost + rangedBonus + equipDmgBonus + skillLvDmgBonus) * passiveDmgMul;
     if (isCrit) baseDamage = baseDamage * 1.5;
@@ -2480,6 +2504,33 @@ function applyStatusFromSkill(skill, target, attacker) {
       addLog(`<span style="color:#88ddff">${target.name} の${target.passive.name}で状態異常を無効化!</span>`);
       flashUnit(target, 'stun'); // 耐性発動エフェクト(黄色フラッシュ流用)
       // 上記でclassListに'flash-stun'付くが、別途passive-resistも付ける
+      const grid = document.getElementById('battle-grid');
+      const cell = grid.children[target.y * BATTLE_W + target.x];
+      const unitEl = cell ? cell.querySelector('.unit') : null;
+      if (unitEl) {
+        unitEl.classList.add('passive-resist');
+        setTimeout(() => unitEl.classList.remove('passive-resist'), 600);
+      }
+      return;
+    }
+  }
+
+  // ★Phase 5.2c-1: 装備の状態異常耐性チェック
+  // statusResist: Stun/Daze/Slow に効く / poisonResist: 毒に効く
+  if (target.equipBonuses) {
+    const isPoison = skill.status === 'poison' || skill.status === 'poison_strong' || skill.status === 'poison_aoe';
+    const isStatusType = skill.status === 'stun' || skill.status === 'stun_aoe' ||
+                         skill.status === 'daze' || skill.status === 'daze_aoe' ||
+                         skill.status === 'slow' || skill.status === 'slow_st_drain';
+    let resistChance = 0;
+    if (isPoison && target.equipBonuses.poisonResist > 0) {
+      resistChance = target.equipBonuses.poisonResist;
+    } else if (isStatusType && target.equipBonuses.statusResist > 0) {
+      resistChance = target.equipBonuses.statusResist;
+    }
+    if (resistChance > 0 && Math.random() * 100 < resistChance) {
+      addLog(`<span style="color:#88ddff">${target.name} は装備の効果で${isPoison ? '毒' : '状態異常'}を無効化!</span>`);
+      flashUnit(target, 'stun');
       const grid = document.getElementById('battle-grid');
       const cell = grid.children[target.y * BATTLE_W + target.x];
       const unitEl = cell ? cell.querySelector('.unit') : null;
