@@ -779,20 +779,21 @@ function getItemsByRank(rank) {
 }
 
 // ★Phase 5.1: 難易度→V1〜V4出現率テーブル
-// V1は常連枠としてどの難易度でも一定割合で出現
+//   v5.1.1 (案C): 全体を1段階スローダウン。序盤はV1〜V2主役、終盤でV3〜V4主役へ。
 const REWARD_VALUE_TABLE = {
-  easy:    { v1: 30, v2: 45, v3: 20, v4: 5  },
-  medium:  { v1: 25, v2: 35, v3: 30, v4: 10 },
-  hard:    { v1: 20, v2: 25, v3: 35, v4: 20 },
-  extreme: { v1: 15, v2: 20, v3: 30, v4: 35 },
+  easy:    { v1: 40, v2: 45, v3: 13, v4: 2  },
+  medium:  { v1: 30, v2: 45, v3: 20, v4: 5  },
+  hard:    { v1: 20, v2: 35, v3: 30, v4: 15 },
+  extreme: { v1: 15, v2: 25, v3: 35, v4: 25 },
 };
 
 // ★旧 REWARD_RANK_TABLE は互換目的で残す(V1+V2=common, V3=rare, V4=epic に集約)
+//   v5.1.1: 新REWARD_VALUE_TABLEから集約した数値
 const REWARD_RANK_TABLE = {
-  easy:    { common: 75, rare: 20, epic: 5  },
-  medium:  { common: 60, rare: 30, epic: 10 },
-  hard:    { common: 45, rare: 35, epic: 20 },
-  extreme: { common: 35, rare: 30, epic: 35 },
+  easy:    { common: 85, rare: 13, epic: 2  },
+  medium:  { common: 75, rare: 20, epic: 5  },
+  hard:    { common: 55, rare: 30, epic: 15 },
+  extreme: { common: 40, rare: 35, epic: 25 },
 };
 
 // BLUE GATE先のステージは難易度より一段強いランク確率にする(底上げ)。
