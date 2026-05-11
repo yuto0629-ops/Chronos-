@@ -13,7 +13,7 @@ const STATUS_EFFECTS = {
 
 // 状態異常付与確率(スキルのstatusキー → 確率%)
 // ====== アイテム定義 ======
-const ITEMS = {"stale_bread": {"name_ja": "古いパン", "color": "orange", "value": 1, "effect": "毎ターンHP+2", "stat": {"hp_regen": 2}}, "fresh_bread": {"name_ja": "焼きたてパン", "color": "orange", "value": 2, "effect": "毎ターンHP+4", "stat": {"hp_regen": 4}}, "scone": {"name_ja": "スコーン", "color": "orange", "value": 2, "effect": "待機でHP+10", "stat": {"wait_hp": 10}}, "cup_wine": {"name_ja": "ワイン", "color": "orange", "value": 2, "effect": "毎ターンST+8", "stat": {"st_regen": 8}}, "horn_plenty": {"name_ja": "豊穣の角笛", "color": "orange", "value": 4, "effect": "毎ターン隣接味方HP+3", "stat": {"aoe_heal": 3}}, "tattered_tunic": {"name_ja": "ボロのチュニック", "color": "blue", "value": 1, "effect": "遠距離防御+3", "stat": {"armor": [0, 3, 0]}}, "leather_cap": {"name_ja": "革帽子", "color": "blue", "value": 1, "effect": "MaxHP+10, MaxST+10", "stat": {"max_hp": 10, "max_st": 10}}, "leather_tunic": {"name_ja": "革のチュニック", "color": "blue", "value": 2, "effect": "遠距離防御+5", "stat": {"armor": [0, 5, 0]}}, "skullcap": {"name_ja": "頭蓋帽", "color": "blue", "value": 2, "effect": "MaxHP+25", "stat": {"max_hp": 25}}, "leather_boots": {"name_ja": "革ブーツ", "color": "blue", "value": 3, "effect": "MaxHP+25, MaxST+25", "stat": {"max_hp": 25, "max_st": 25}}, "sturdy_helm": {"name_ja": "頑丈な兜", "color": "blue", "value": 4, "effect": "MaxHP+50", "stat": {"max_hp": 50}}, "parchment_skill": {"name_ja": "技能の羊皮紙", "color": "pink", "value": 1, "effect": "全攻撃Crit+15%", "stat": {"crit_bonus": 15}}, "stone_strength": {"name_ja": "力の石", "color": "pink", "value": 2, "effect": "単発攻撃力+7", "stat": {"single_dmg": 7}}, "book_skill": {"name_ja": "技能の書", "color": "pink", "value": 2, "effect": "全攻撃Crit+20%", "stat": {"crit_bonus": 20}}, "emblem_swords": {"name_ja": "剣の紋章", "color": "pink", "value": 3, "effect": "全攻撃力+2", "stat": {"all_dmg": 2}}, "stone_might": {"name_ja": "豪腕の石", "color": "pink", "value": 3, "effect": "単発攻撃力+11", "stat": {"single_dmg": 11}}, "stone_power": {"name_ja": "強力の石", "color": "pink", "value": 4, "effect": "単発攻撃力+14", "stat": {"single_dmg": 14}}};
+const ITEMS = {"stale_bread": {"name_ja": "古いパン", "name_en": "Stale Bread", "color": "orange", "value": 1, "effect": "毎ターンHP+2", "stat": {"hp_regen": 2}}, "vinegar_cup": {"name_ja": "酢の杯", "name_en": "Cup of Vinegar", "color": "orange", "value": 1, "effect": "毎ターンST+5", "stat": {"st_regen": 5}}, "fresh_bread": {"name_ja": "焼きたてパン", "name_en": "Fresh Bread", "color": "orange", "value": 2, "effect": "毎ターンHP+4", "stat": {"hp_regen": 4}}, "wine_cup": {"name_ja": "ワイン", "name_en": "Cup of Wine", "color": "orange", "value": 2, "effect": "毎ターンST+8", "stat": {"st_regen": 8}}, "scrumptious_bread": {"name_ja": "極上パン", "name_en": "Scrumptious Bread", "color": "orange", "value": 3, "effect": "毎ターンHP+6", "stat": {"hp_regen": 6}}, "fine_meal": {"name_ja": "上等な食事", "name_en": "Fine Meal", "color": "orange", "value": 3, "effect": "毎ターンHP+4・ST+5", "stat": {"hp_regen": 4, "st_regen": 5}}, "gourmand_bread": {"name_ja": "美食家のパン", "name_en": "Bread of The Gourmand", "color": "orange", "value": 4, "effect": "毎ターンHP+8", "stat": {"hp_regen": 8}}, "fine_wine_cup": {"name_ja": "上等なワイン", "name_en": "Cup of Fine Wine", "color": "orange", "value": 4, "effect": "毎ターンST+10", "stat": {"st_regen": 10}}, "horn_plenty": {"name_ja": "豊穣の角笛", "name_en": "Horn of Plenty", "color": "orange", "value": 4, "effect": "毎ターン隣接ユニットHP+10", "stat": {"aoe_heal": 10}}, "pumpernickel_bread": {"name_ja": "プンパニッケル", "name_en": "Pumpernickel Bread", "color": "orange", "value": 4, "effect": "毎ターンHP+5・近接攻撃+2", "stat": {"hp_regen": 5, "melee_dmg": 2}}, "tattered_tunic": {"name_ja": "ボロのチュニック", "name_en": "Tattered Tunic", "color": "blue", "value": 1, "effect": "遠距離防御+3", "stat": {"armor": [0, 3, 0]}}, "leather_cap": {"name_ja": "革帽子", "name_en": "Leather Cap", "color": "blue", "value": 1, "effect": "最大HP+10・ST+10", "stat": {"max_hp": 10, "max_st": 10}}, "leather_tunic": {"name_ja": "革のチュニック", "name_en": "Leather Tunic", "color": "blue", "value": 2, "effect": "遠距離防御+5", "stat": {"armor": [0, 5, 0]}}, "skullcap": {"name_ja": "頭蓋帽", "name_en": "Skullcap", "color": "blue", "value": 2, "effect": "最大HP+25", "stat": {"max_hp": 25}}, "leather_gloves": {"name_ja": "革の手袋", "name_en": "Leather Gloves", "color": "blue", "value": 2, "effect": "近接防御+5", "stat": {"armor": [5, 0, 0]}}, "leather_sandals": {"name_ja": "革サンダル", "name_en": "Leather Sandals", "color": "blue", "value": 2, "effect": "最大ST+35", "stat": {"max_st": 35}}, "woolen_vest": {"name_ja": "毛織のベスト", "name_en": "Woolen Vest", "color": "blue", "value": 3, "effect": "近接+2/魔法+6防御", "stat": {"armor": [2, 0, 6]}}, "studded_tunic": {"name_ja": "スタッド付きチュニック", "name_en": "Studded Tunic", "color": "blue", "value": 3, "effect": "遠距離防御+8", "stat": {"armor": [0, 8, 0]}}, "helm": {"name_ja": "兜", "name_en": "Helm", "color": "blue", "value": 3, "effect": "最大HP+40", "stat": {"max_hp": 40}}, "combat_gloves": {"name_ja": "戦闘手袋", "name_en": "Combat Gloves", "color": "blue", "value": 3, "effect": "近接防御+8", "stat": {"armor": [8, 0, 0]}}, "leather_boots": {"name_ja": "革ブーツ", "name_en": "Leather Boots", "color": "blue", "value": 3, "effect": "最大HP+25・最大ST+25", "stat": {"max_hp": 25, "max_st": 25}}, "hunters_vest": {"name_ja": "ハンターのベスト", "name_en": "Hunter's Vest", "color": "blue", "value": 4, "effect": "遠距離+6/魔法+4防御", "stat": {"armor": [0, 6, 4]}}, "mail_tunic": {"name_ja": "鎖帷子", "name_en": "Mail Tunic", "color": "blue", "value": 4, "effect": "遠距離防御+10", "stat": {"armor": [0, 10, 0]}}, "fabled_vest": {"name_ja": "伝説のベスト", "name_en": "Fabled Vest", "color": "blue", "value": 4, "effect": "最大HP+20・ST+15・全防御+2", "stat": {"max_hp": 20, "max_st": 15, "armor": [2, 2, 2]}}, "sturdy_helm": {"name_ja": "頑丈な兜", "name_en": "Sturdy Helm", "color": "blue", "value": 4, "effect": "最大HP+50", "stat": {"max_hp": 50}}, "war_gloves": {"name_ja": "戦争の手袋", "name_en": "War Gloves", "color": "blue", "value": 4, "effect": "近接+6/遠距離+4防御", "stat": {"armor": [6, 4, 0]}}, "kingly_sandals": {"name_ja": "王者のサンダル", "name_en": "Kingly Sandals", "color": "blue", "value": 4, "effect": "最大ST+35・遠距離+3/魔法+2防御", "stat": {"max_st": 35, "armor": [0, 3, 2]}}, "nobles_cap": {"name_ja": "貴族の帽子", "name_en": "Noble's Cap", "color": "blue", "value": 4, "effect": "最大HP+30・毎ターンST+5", "stat": {"max_hp": 30, "st_regen": 5}}, "battle_gloves": {"name_ja": "バトルグローブ", "name_en": "Battle Gloves", "color": "blue", "value": 4, "effect": "毎ターンST+3・近接+6/魔法+1防御", "stat": {"st_regen": 3, "armor": [6, 0, 1]}}, "parchment_skill": {"name_ja": "技能の羊皮紙", "name_en": "Parchment of Skill", "color": "pink", "value": 1, "effect": "全攻撃Crit+15%", "stat": {"crit_bonus": 15}}, "book_skill": {"name_ja": "技能の書", "name_en": "Book of Skill", "color": "pink", "value": 2, "effect": "全攻撃Crit+20%", "stat": {"crit_bonus": 20}}, "emblem_fists": {"name_ja": "拳の紋章", "name_en": "Emblem of Fists", "color": "pink", "value": 2, "effect": "全攻撃+1・近接+1", "stat": {"all_dmg": 1, "melee_dmg": 1}}, "stone_strength": {"name_ja": "力の石", "name_en": "Stone of Strength", "color": "pink", "value": 2, "effect": "単発攻撃力+7", "stat": {"single_dmg": 7}}, "emblem_swords": {"name_ja": "剣の紋章", "name_en": "Emblem of Swords", "color": "pink", "value": 3, "effect": "全攻撃+2・近接+1", "stat": {"all_dmg": 2, "melee_dmg": 1}}, "emblem_arrows": {"name_ja": "矢の紋章", "name_en": "Emblem of Arrows", "color": "pink", "value": 3, "effect": "遠距離+3・単発+4", "stat": {"ranged_dmg": 3, "single_dmg": 4}}, "stone_might": {"name_ja": "豪腕の石", "name_en": "Stone of Might", "color": "pink", "value": 3, "effect": "単発攻撃力+11", "stat": {"single_dmg": 11}}, "book_mastery": {"name_ja": "達人の書", "name_en": "Book of Mastery", "color": "pink", "value": 4, "effect": "全攻撃Crit+30%", "stat": {"crit_bonus": 30}}, "emblem_war": {"name_ja": "戦争の紋章", "name_en": "Emblem of War", "color": "pink", "value": 4, "effect": "全攻撃+3・近接+1", "stat": {"all_dmg": 3, "melee_dmg": 1}}, "emblem_volleys": {"name_ja": "斉射の紋章", "name_en": "Emblem of Volleys", "color": "pink", "value": 4, "effect": "遠距離+4・単発+5", "stat": {"ranged_dmg": 4, "single_dmg": 5}}, "stone_power": {"name_ja": "強力の石", "name_en": "Stone of Power", "color": "pink", "value": 4, "effect": "単発攻撃力+14", "stat": {"single_dmg": 14}}};
 
 // ====== レベル毎の必要経験値 ======
 function expRequired(level) {
@@ -755,67 +755,81 @@ function getClassesByRank(rank) {
 }
 
 // ★Phase 2 Step 3: アイテムのランク分類
-// data_items.json の value を基準に振り分け
-const ITEM_RANKS = {
-  // === common (低価値、序盤向け) ===
-  stale_bread:      'common',
-  fresh_bread:      'common',
-  scone:            'common',
-  cup_wine:         'common',
-  tattered_tunic:   'common',
-  leather_cap:      'common',
-  leather_tunic:    'common',
-  skullcap:         'common',
-  parchment_skill:  'common',
+// ★Phase 5.1: アイテムは ITEMS[].value (1〜4) を直接ランクとして使う
+// 旧 ITEM_RANKS (common/rare/epic) は廃止。互換ラッパーで残す。
+const ITEM_RANKS = (() => {
+  // 互換目的: 旧コードが ITEM_RANKS[key] を見ても動くよう、value を common/rare/epic にざっくり対応
+  // V1 → common, V2 → common, V3 → rare, V4 → epic
+  const m = {};
+  Object.keys(ITEMS).forEach(k => {
+    const v = ITEMS[k].value;
+    m[k] = (v <= 2 ? 'common' : v === 3 ? 'rare' : 'epic');
+  });
+  return m;
+})();
 
-  // === rare (中価値、中盤向け) ===
-  horn_plenty:      'rare',
-  stone_strength:   'rare',
-  book_skill:       'rare',
-  emblem_swords:    'rare',
-  stone_might:      'rare',
-  leather_boots:    'rare',
+// value(1〜4) → そのvalueに該当するアイテムキー配列
+function getItemsByValue(value) {
+  return Object.keys(ITEMS).filter(k => ITEMS[k].value === value);
+}
 
-  // === epic (高価値、ボス前後) ===
-  sturdy_helm:      'epic',
-  stone_power:      'epic',
-};
-
-// ランク → そのランクに該当するアイテムキーの配列(逆引き)
+// 旧API互換: ランク → アイテムキー配列
 function getItemsByRank(rank) {
   return Object.keys(ITEM_RANKS).filter(k => ITEM_RANKS[k] === rank);
 }
 
-// ★Phase 2 Step 3: 難易度→報酬ランク確率テーブル
-// 数値はパーセンテージ(合計100)。難しいほどレア/エピックの確率が上がる。
+// ★Phase 5.1: 難易度→V1〜V4出現率テーブル
+// V1は常連枠としてどの難易度でも一定割合で出現
+const REWARD_VALUE_TABLE = {
+  easy:    { v1: 30, v2: 45, v3: 20, v4: 5  },
+  medium:  { v1: 25, v2: 35, v3: 30, v4: 10 },
+  hard:    { v1: 20, v2: 25, v3: 35, v4: 20 },
+  extreme: { v1: 15, v2: 20, v3: 30, v4: 35 },
+};
+
+// ★旧 REWARD_RANK_TABLE は互換目的で残す(V1+V2=common, V3=rare, V4=epic に集約)
 const REWARD_RANK_TABLE = {
-  easy:    { common: 70, rare: 25, epic: 5 },
-  medium:  { common: 40, rare: 50, epic: 10 },
-  hard:    { common: 20, rare: 50, epic: 30 },
-  extreme: { common: 10, rare: 40, epic: 50 },
+  easy:    { common: 75, rare: 20, epic: 5  },
+  medium:  { common: 60, rare: 30, epic: 10 },
+  hard:    { common: 45, rare: 35, epic: 20 },
+  extreme: { common: 35, rare: 30, epic: 35 },
 };
 
 // BLUE GATE先のステージは難易度より一段強いランク確率にする(底上げ)。
-// 例: easy → medium相当、medium → hard相当
 const BLUEGATE_DIFFICULTY_BONUS = {
   easy:    'medium',
   medium:  'hard',
   hard:    'extreme',
-  extreme: 'extreme',  // 既に最高なのでそのまま
+  extreme: 'extreme',
 };
 
-// ミッションの難易度とBLUEゲートフラグから、ランク確率テーブルを返す
+// ミッションの難易度とBLUEゲートフラグから、value出現率テーブルを返す
+function getRewardValueProbs(difficulty, isBlueGate) {
+  const effectiveDiff = isBlueGate ? (BLUEGATE_DIFFICULTY_BONUS[difficulty] || difficulty) : difficulty;
+  return REWARD_VALUE_TABLE[effectiveDiff] || REWARD_VALUE_TABLE.easy;
+}
+
+// 旧API互換: ランク確率テーブル
 function getRewardRankProbs(difficulty, isBlueGate) {
   const effectiveDiff = isBlueGate ? (BLUEGATE_DIFFICULTY_BONUS[difficulty] || difficulty) : difficulty;
   return REWARD_RANK_TABLE[effectiveDiff] || REWARD_RANK_TABLE.easy;
 }
 
-// 確率テーブルからランクを抽選
-function rollRewardRank(difficulty, isBlueGate) {
-  const probs = getRewardRankProbs(difficulty, isBlueGate);
+// ★Phase 5.1: 確率テーブルからvalue(1〜4)を抽選
+function rollRewardValue(difficulty, isBlueGate) {
+  const probs = getRewardValueProbs(difficulty, isBlueGate);
   const r = Math.random() * 100;
-  if (r < probs.common) return 'common';
-  if (r < probs.common + probs.rare) return 'rare';
+  if (r < probs.v1) return 1;
+  if (r < probs.v1 + probs.v2) return 2;
+  if (r < probs.v1 + probs.v2 + probs.v3) return 3;
+  return 4;
+}
+
+// 旧API互換: ランク抽選(V1V2→common, V3→rare, V4→epic に集約)
+function rollRewardRank(difficulty, isBlueGate) {
+  const v = rollRewardValue(difficulty, isBlueGate);
+  if (v <= 2) return 'common';
+  if (v === 3) return 'rare';
   return 'epic';
 }
 

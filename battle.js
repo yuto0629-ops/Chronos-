@@ -207,6 +207,8 @@ function applyEquipment(unit, equippedKeys) {
     crit: 0,
     allDmg: 0,
     singleDmg: 0,
+    meleeDmg: 0,      // ★Phase 5.1: 近接攻撃力ボーナス
+    rangedDmg: 0,     // ★Phase 5.1: 遠距離攻撃力ボーナス
     hpRegen: 0,
     stRegen: 0,
     waitHP: 0,
@@ -234,6 +236,8 @@ function applyEquipment(unit, equippedKeys) {
     if (s.crit_bonus) unit.equipBonuses.crit += s.crit_bonus;
     if (s.all_dmg)    unit.equipBonuses.allDmg += s.all_dmg;
     if (s.single_dmg) unit.equipBonuses.singleDmg += s.single_dmg;
+    if (s.melee_dmg)  unit.equipBonuses.meleeDmg += s.melee_dmg;   // ★Phase 5.1: 近接攻撃力+
+    if (s.ranged_dmg) unit.equipBonuses.rangedDmg += s.ranged_dmg; // ★Phase 5.1: 遠距離攻撃力+
     if (s.hp_regen)   unit.equipBonuses.hpRegen += s.hp_regen;
     if (s.st_regen)   unit.equipBonuses.stRegen += s.st_regen;
     if (s.wait_hp)    unit.equipBonuses.waitHP += s.wait_hp;
@@ -2308,6 +2312,12 @@ function applyDamage(attacker, target, skill) {
   if (attacker.equipBonuses) {
     equipDmgBonus = attacker.equipBonuses.allDmg;
     if (skill.hits === 1) equipDmgBonus += attacker.equipBonuses.singleDmg;
+    // ★Phase 5.1: 近接(M)/遠距離(R, S)別ボーナス
+    if (skill.type === 'M') {
+      equipDmgBonus += (attacker.equipBonuses.meleeDmg || 0);
+    } else if (skill.type === 'R' || skill.type === 'S') {
+      equipDmgBonus += (attacker.equipBonuses.rangedDmg || 0);
+    }
     equipCritBonus = attacker.equipBonuses.crit;
   }
 
@@ -3419,8 +3429,8 @@ function showSubMissionReward(mission, subMission, expGained) {
 
   // ★starter_pack: EXP(済) + ランダムアイテム1個(自動付与) + ランダム仲間1人
   if (rewardType === 'starter_pack') {
-    // 1. ランダムアイテム自動付与 (★Phase 2 Step 3: commonランクから)
-    let starterPool = getItemsByRank('common');
+    // 1. ランダムアイテム自動付与 (★Phase 5.1: V1〜V2の中から)
+    let starterPool = getItemsByValue(1).concat(getItemsByValue(2));
     if (starterPool.length === 0) starterPool = Object.keys(ITEMS);
     const randomItem = starterPool[Math.floor(Math.random() * starterPool.length)];
     if (!state.inventory) state.inventory = [];
@@ -3441,16 +3451,16 @@ function showSubMissionReward(mission, subMission, expGained) {
   }
 
   if (rewardType === 'item') {
-    // ★Phase 2 Step 3: 難易度+BLUEゲートからランク抽選してそのランクのアイテムから選ぶ
+    // ★Phase 5.1: 難易度+BLUEゲートからvalue抽選してそのvalueのアイテムから選ぶ
     const difficulty = subMission.difficulty || 'easy';
     const isBlueGate = !!(subMission.blueGate || mission.blueGate);
-    // 3候補を出すが、それぞれ別ランクで抽選するとバラエティが出る
+    // 3候補を出すが、それぞれ別valueで抽選するとバラエティが出る
     const candidates = [];
     for (let i = 0; i < 3; i++) {
-      const rank = rollRewardRank(difficulty, isBlueGate);
-      let pool = getItemsByRank(rank);
-      // フォールバック(空ならcommon、それでも空なら全アイテム)
-      if (pool.length === 0) pool = getItemsByRank('common');
+      const value = rollRewardValue(difficulty, isBlueGate);
+      let pool = getItemsByValue(value);
+      // フォールバック(空ならV1、それでも空なら全アイテム)
+      if (pool.length === 0) pool = getItemsByValue(1);
       if (pool.length === 0) pool = Object.keys(ITEMS);
       // 同候補との重複を避ける
       const filtered = pool.filter(k => !candidates.includes(k));
