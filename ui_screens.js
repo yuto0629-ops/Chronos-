@@ -408,12 +408,37 @@ function showDebugMenu() {
   function makeMonkParty(lv) {
     if (!confirm(`現在のパーティの先頭2人(初期PT)を保持し、モンクLv${lv}×4人を追加します(計6人)。よろしいですか?`)) return;
 
-    // ★初期PTの2人だけ残す(それ以外をクレンジング、過去のバグで混入した錬金術師等を排除)
-    if (state.partyData.length > 2) {
-      state.partyData = state.partyData.slice(0, 2);
-    }
-    if (state.party.length > 2) {
-      state.party = state.party.slice(0, 2);
+    // ★クレンジング強化: STARTER_PARTIES の正規初期メンバー以外を全排除
+    //   (alchemist 等が誤って紛れ込んでた場合も確実に除去できる)
+    const validStarterClasses = new Set();
+    Object.values(STARTER_PARTIES || {}).forEach(pt => {
+      (pt.members || []).forEach(cls => validStarterClasses.add(cls));
+    });
+    // 正規クラスのキャラだけフィルタ
+    state.partyData = (state.partyData || []).filter(pd => validStarterClasses.has(pd.classKey));
+    state.party = (state.party || []).filter(cls => validStarterClasses.has(cls));
+    // 先頭2人だけ残す
+    if (state.partyData.length > 2) state.partyData = state.partyData.slice(0, 2);
+    if (state.party.length > 2) state.party = state.party.slice(0, 2);
+    // ★万一空になった場合の保険: チャンピオン+バーバリアンを初期PTとして補填
+    if (state.partyData.length === 0) {
+      ['champion', 'barbarian'].forEach((cls, i) => {
+        const cd = CLASSES[cls];
+        if (!cd) return;
+        let mh = cd.hp_base + cd.hp_per_level * 0;
+        if (cd.hp_override) mh = cd.hp_override;
+        const sk = SKILLS[cls] || [];
+        const sl = {};
+        sk.forEach((_, idx) => { sl[idx] = 1; });
+        const namesPool2 = (CHAR_NAMES[cls] || [cls]);
+        state.partyData.push({
+          classKey: cls, charName: namesPool2[0] || cls, level: 1,
+          hp: mh, maxHP: mh, exp: 0,
+          equipped: [], skillPoints: 0, skillLevels: sl,
+          passiveLevel: 1, addedSkills: [],
+        });
+        state.party.push(cls);
+      });
     }
 
     const cls = 'monk';
