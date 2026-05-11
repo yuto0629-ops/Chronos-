@@ -791,6 +791,7 @@ function renderCharStats(pd) {
   let armorBonus = [0, 0, 0];
   let maxHpBonus = 0, maxStBonus = 0;
   let allDmg = 0, singleDmg = 0, critBonus = 0;
+  let meleeDmg = 0, rangedDmg = 0;  // ★Phase 5.1
   let hpRegen = 0, stRegen = 0, waitHp = 0, aoeHeal = 0;
 
   (pd.equipped || []).forEach(key => {
@@ -802,6 +803,8 @@ function renderCharStats(pd) {
     if (s.max_st) maxStBonus += s.max_st;
     if (s.all_dmg) allDmg += s.all_dmg;
     if (s.single_dmg) singleDmg += s.single_dmg;
+    if (s.melee_dmg) meleeDmg += s.melee_dmg;     // ★Phase 5.1
+    if (s.ranged_dmg) rangedDmg += s.ranged_dmg;  // ★Phase 5.1
     if (s.crit_bonus) critBonus += s.crit_bonus;
     if (s.hp_regen) hpRegen += s.hp_regen;
     if (s.st_regen) stRegen += s.st_regen;
@@ -853,7 +856,11 @@ function renderCharStats(pd) {
     const sLv = (pd.skillLevels && pd.skillLevels[realIdx]) || 1;
     const dmgTable = [0, 5, 10, 18, 28];
     const lvDmgBonus = Math.floor((dmgTable[sLv - 1] || 0) / Math.max(1, main.hits));
-    const totalDmg = main.damage + allDmg + (main.hits === 1 ? singleDmg : 0) + lvDmgBonus;
+    // ★Phase 5.1: スキルタイプに応じた近接/遠距離ボーナスも加算
+    let typeDmg = 0;
+    if (main.type === 'M') typeDmg = meleeDmg;
+    else if (main.type === 'R' || main.type === 'S') typeDmg = rangedDmg;
+    const totalDmg = main.damage + allDmg + (main.hits === 1 ? singleDmg : 0) + typeDmg + lvDmgBonus;
     const dmgStr = main.hits > 1 ? `${totalDmg}×${main.hits}` : `${totalDmg}`;
     const typeLabel = { M: '近接', R: '遠距', S: '魔法' }[main.type] || '';
     const totalCrit = main.crit + critBonus + passiveCritBonus + (sLv - 1) * 5;
@@ -874,6 +881,8 @@ function renderCharStats(pd) {
   if (maxHpBonus > 0) bonusParts.push(`HP+${maxHpBonus}`);
   if (allDmg > 0) bonusParts.push(`攻撃+${allDmg}`);
   if (singleDmg > 0) bonusParts.push(`単発+${singleDmg}`);
+  if (meleeDmg > 0) bonusParts.push(`近接+${meleeDmg}`);     // ★Phase 5.1
+  if (rangedDmg > 0) bonusParts.push(`遠距離+${rangedDmg}`); // ★Phase 5.1
   if (critBonus > 0) bonusParts.push(`Crit+${critBonus}%`);
   if (hpRegen > 0) bonusParts.push(`HP再生+${hpRegen}/T`);
   if (stRegen > 0) bonusParts.push(`ST再生+${stRegen}/T`);
