@@ -279,37 +279,37 @@ function ensureDebugButton() {
   if (!DEBUG_MODE) return;
   if (document.getElementById('debug-menu-btn')) return;
 
-  // 編成ボタンを探す(ID/テキストで)
-  let partyBtn = document.querySelector('[onclick*="party"]') ||
-                 document.getElementById('btn-party') ||
-                 Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '編成');
-
   const btn = document.createElement('button');
   btn.id = 'debug-menu-btn';
-  btn.textContent = '🛠 DEBUG';
+  btn.textContent = '🛠';
+  btn.title = 'DEBUG MENU';
+  // ★画面左下に固定。サイズ小さめ、半透明でマップ操作の邪魔をしない
   btn.style.cssText = `
-    background: #6a2020; color: #fff; border: 1px solid #ff6060;
-    padding: 6px 12px; font-size: 11px; font-weight: 800;
-    border-radius: 4px; cursor: pointer; margin-left: 6px;
-    letter-spacing: 1px;
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    background: rgba(106, 32, 32, 0.85);
+    color: #fff;
+    border: 1px solid #ff6060;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    z-index: 9000;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   `;
   btn.onclick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     showDebugMenu();
   };
-
-  if (partyBtn && partyBtn.parentNode) {
-    // 編成ボタンの直後に配置
-    partyBtn.parentNode.insertBefore(btn, partyBtn.nextSibling);
-  } else {
-    // 編成ボタンが見つからなければ、画面右上に固定配置
-    btn.style.position = 'fixed';
-    btn.style.top = '8px';
-    btn.style.right = '8px';
-    btn.style.zIndex = '9000';
-    document.body.appendChild(btn);
-  }
+  document.body.appendChild(btn);
 }
 
 // ★Phase3 v9: DEBUGメニュー表示
