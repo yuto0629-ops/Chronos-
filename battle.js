@@ -3768,13 +3768,18 @@ function handleEventVictory(mission, expGained, levelUps) {
     recruit = createRecruitUnit('barbarian', 2, 'Tor');
     recruitMessage = '🎉 Tor が仲間に加入した!';
   } else if (mission.id === 'event_potion_master') {
-    // E2: Mortimerの弟子(alchemist Lv5)がランダム名で加入
+    // E2: Mortimerの弟子(alchemist)がランダム名で加入。Lvはパーティ平均Lv(バランス重視)
     const alchemistNames = (CHAR_NAMES && CHAR_NAMES.alchemist) || ['Wilbur', 'Reginald', 'Theobald', 'Algernon'];
     const usedNames = (state.partyData || []).map(p => p.charName).filter(Boolean);
     const available = alchemistNames.filter(n => n !== 'Mortimer' && !usedNames.includes(n));
     const name = available[Math.floor(Math.random() * available.length)] || 'Wilbur';
-    recruit = createRecruitUnit('alchemist', 5, name);
-    recruitMessage = `🎉 ${name} (Mortimerの弟子) が仲間に加入した!`;
+    // パーティ平均Lv(最低1、四捨五入)
+    const partyLevels = (state.partyData || []).map(p => p.level || 1);
+    const avgLv = partyLevels.length > 0
+      ? Math.max(1, Math.round(partyLevels.reduce((a, b) => a + b, 0) / partyLevels.length))
+      : 1;
+    recruit = createRecruitUnit('alchemist', avgLv, name);
+    recruitMessage = `🎉 ${name}(Lv${avgLv}・Mortimerの弟子) が仲間に加入した!`;
   } else if (mission.id === 'event_bandit_chief') {
     // E3: 加入なし、宝箱(BLUE KEY + Oil of Dazing)獲得
     recruit = null;
@@ -5129,23 +5134,36 @@ function enterBattle(missionId) {
   goTo('battle');
 }
 
-// ★v3.10: 戦闘前ダイアログ(対面シーン)
+// ★v3.10 / v3.11: 戦闘前ダイアログ(対面シーン)
+//   ミッションIDで分岐(bandit_chief / potion_master 等)
 function showBossPreBattleDialog(mission, onContinue) {
   document.querySelectorAll('.boss-dialog-overlay').forEach(o => o.remove());
   const overlay = document.createElement('div');
   overlay.className = 'boss-dialog-overlay';
 
-  // bandit_boss専用のセリフ(将来別ボスが増えたら拡張可)
-  const dialog = {
-    name: '盗賊団首領',
-    subtitle: '― 廃墟と化した酒場にて ―',
-    text: '「……ここに来たか。」\n\n「酒場はもう死んだ。流れ者を相手取る気分じゃないが…\n仕方ねぇ、抜くか。」'
-  };
+  // ミッション別セリフテーブル
+  let dialog, portraitSpriteKey;
+  if (mission.id === 'event_potion_master') {
+    dialog = {
+      name: 'Mortimer',
+      subtitle: '― 泉のほとり、煮立つ釜の前で ―',
+      text: '「ふん…主らよ、わしの薬を試させてもらおうか。」\n\n「逃げるなら今のうちぞ。」'
+    };
+    portraitSpriteKey = 'alchemist';
+  } else {
+    // 既定: bandit_boss(山賊頭領)
+    dialog = {
+      name: '盗賊団首領',
+      subtitle: '― 廃墟と化した酒場にて ―',
+      text: '「……ここに来たか。」\n\n「酒場はもう死んだ。流れ者を相手取る気分じゃないが…\n仕方ねぇ、抜くか。」'
+    };
+    portraitSpriteKey = 'bandit_boss';
+  }
 
   overlay.innerHTML = `
     <div class="boss-dialog-content">
       <div class="boss-portrait">
-        <img src="data:image/png;base64,${SPRITES.bandit_boss}" alt="${dialog.name}">
+        <img src="data:image/png;base64,${SPRITES[portraitSpriteKey]}" alt="${dialog.name}">
       </div>
       <div class="boss-dialog-name">${dialog.name}</div>
       <div class="boss-dialog-subtitle">${dialog.subtitle}</div>
@@ -5161,27 +5179,43 @@ function showBossPreBattleDialog(mission, onContinue) {
   });
 }
 
-// ★v3.10: 戦闘後ダイアログ(ボス撃破時)
+// ★v3.10 / v3.11: 戦闘後ダイアログ(ボス撃破時)
+//   Mortimer用は「弟子を受け取る」表示(実加入は既存のhandleEventVictoryで処理)
 function showBossPostBattleDialog(mission, onContinue) {
   document.querySelectorAll('.boss-dialog-overlay').forEach(o => o.remove());
   const overlay = document.createElement('div');
   overlay.className = 'boss-dialog-overlay';
 
-  const dialog = {
-    name: '盗賊団首領',
-    subtitle: '― 倒れ伏す男 ―',
-    text: '「……強ぇな、お前ら。」\n\n「行け。鍵をくれてやる。\nまた どこかで会おう ……まだ本気は出してねぇぜ。」'
-  };
+  // ミッション別セリフ + ボタンラベル
+  let dialog, portraitSpriteKey, buttonLabel;
+  if (mission.id === 'event_potion_master') {
+    dialog = {
+      name: 'Mortimer',
+      subtitle: '― 釜の火が静かに揺れる ―',
+      text: '「……まさか、わしが負ける日が来るとはな。」\n\n「これを持って行け。\nわしの弟子じゃ。役に立つはずだ。」'
+    };
+    portraitSpriteKey = 'alchemist';
+    buttonLabel = '▶ 弟子を受け取る';
+  } else {
+    // 既定: bandit_boss(山賊頭領)
+    dialog = {
+      name: '盗賊団首領',
+      subtitle: '― 倒れ伏す男 ―',
+      text: '「……強ぇな、お前ら。」\n\n「行け。鍵をくれてやる。\nまた どこかで会おう ……まだ本気は出してねぇぜ。」'
+    };
+    portraitSpriteKey = 'bandit_boss';
+    buttonLabel = '▶ 続ける';
+  }
 
   overlay.innerHTML = `
     <div class="boss-dialog-content">
       <div class="boss-portrait" style="filter: grayscale(0.6) brightness(0.7);">
-        <img src="data:image/png;base64,${SPRITES.bandit_boss}" alt="${dialog.name}">
+        <img src="data:image/png;base64,${SPRITES[portraitSpriteKey]}" alt="${dialog.name}">
       </div>
       <div class="boss-dialog-name">${dialog.name}</div>
       <div class="boss-dialog-subtitle">${dialog.subtitle}</div>
       <div class="boss-dialog-text">${dialog.text}</div>
-      <button class="boss-dialog-button" id="boss-post-continue">▶ 続ける</button>
+      <button class="boss-dialog-button" id="boss-post-continue">${buttonLabel}</button>
     </div>
   `;
   document.body.appendChild(overlay);
