@@ -243,7 +243,7 @@ function applyEquipment(unit, equippedKeys) {
     if (s.hp_regen)   unit.equipBonuses.hpRegen += s.hp_regen;
     if (s.st_regen)   unit.equipBonuses.stRegen += s.st_regen;
     if (s.wait_hp)    unit.equipBonuses.waitHP += s.wait_hp;
-    if (s.wait_atk_buff) unit.equipBonuses.waitAtkBuffs.push({...s.wait_atk_buff}); // ★Phase 5.2a
+    if (s.wait_atk_buff) unit.equipBonuses.waitAtkBuffs.push({key, ...s.wait_atk_buff}); // ★Phase 5.2a: keyで識別
     if (s.wait_aoe_st)   unit.equipBonuses.waitAoeST += s.wait_aoe_st;              // ★Phase 5.2a
     if (s.aoe_heal)   unit.equipBonuses.aoeHeal += s.aoe_heal;
   });
@@ -1601,16 +1601,44 @@ function showUnitStatusPopup(u) {
     const parts = [];
     if (eb.allDmg > 0) parts.push(`攻撃+${eb.allDmg}`);
     if (eb.singleDmg > 0) parts.push(`単発+${eb.singleDmg}`);
+    if (eb.meleeDmg > 0) parts.push(`近接+${eb.meleeDmg}`);       // ★Phase 5.1
+    if (eb.rangedDmg > 0) parts.push(`遠距離+${eb.rangedDmg}`);   // ★Phase 5.1
     if (eb.crit > 0) parts.push(`Crit+${eb.crit}%`);
     if (eb.hpRegen > 0) parts.push(`HP再生+${eb.hpRegen}/T`);
     if (eb.stRegen > 0) parts.push(`ST再生+${eb.stRegen}/T`);
+    if (eb.waitHP > 0) parts.push(`待機HP+${eb.waitHP}`);          // ★Phase 5.2a
+    if (eb.waitAtkBuffs && eb.waitAtkBuffs.length > 0) {            // ★Phase 5.2a
+      // 同キーごとに集計して表示
+      const grouped = {};
+      eb.waitAtkBuffs.forEach(buf => {
+        if (!grouped[buf.key]) grouped[buf.key] = {amount: 0, turns: 0};
+        grouped[buf.key].amount += (buf.amount || 0);
+        grouped[buf.key].turns = Math.max(grouped[buf.key].turns, buf.turns || 0);
+      });
+      const totalAmount = Object.values(grouped).reduce((sum, g) => sum + g.amount, 0);
+      const maxTurns = Math.max(...Object.values(grouped).map(g => g.turns));
+      parts.push(`待機攻撃+${totalAmount}(${maxTurns}T)`);
+    }
+    if (eb.waitAoeST > 0) parts.push(`待機隣接ST+${eb.waitAoeST}`); // ★Phase 5.2a
+    if (eb.aoeHeal > 0) parts.push(`隣接回復+${eb.aoeHeal}/T`);     // ★Phase 5.1
     if (parts.length > 0) {
       equipInfo = `<div class="usp-equip">⚡ ${parts.join(' / ')}</div>`;
     }
   }
 
-  // ステータス異常
-  const statusParts = (u.statuses || []).map(s => {
+  // ★Phase 5.2a: 現在発動中の equip_atk_buff も表示(待機後に乗ってるバフ)
+  let activeBuffsHtml = '';
+  if (u.statuses && u.statuses.length > 0) {
+    const activeBuffs = u.statuses.filter(s => s.type === 'equip_atk_buff');
+    if (activeBuffs.length > 0) {
+      const totalAmt = activeBuffs.reduce((sum, b) => sum + (b.amount || 0), 0);
+      const minTurns = Math.min(...activeBuffs.map(b => b.turns || 0));
+      activeBuffsHtml = `<div class="usp-equip" style="color:#ffaa44;">⚔ 攻撃+${totalAmt} (残${minTurns}T)</div>`;
+    }
+  }
+
+  // ステータス異常(★equip_atk_buffはactiveBuffsHtmlで別表示するため除外)
+  const statusParts = (u.statuses || []).filter(s => s.type !== 'equip_atk_buff').map(s => {
     const def = STATUS_EFFECTS[s.type];
     return def ? `<span class="usp-status-tag">${def.ja}</span>` : '';
   }).join(' ');
@@ -1684,6 +1712,7 @@ function showUnitStatusPopup(u) {
         <span class="usp-stat-pill" title="DASH">DS${u.dash}</span>
       </div>
       ${equipInfo}
+      ${activeBuffsHtml}
       ${passiveHTML}
       ${statusHTML}
       ${skillsList ? `<div class="usp-skills-section">${skillsList}</div>` : ''}
@@ -4946,17 +4975,42 @@ function actionWait() {
     }
   }
 
-  // ★Phase 5.2a: その場待機時のwait_atk_buff発動(Drumstick/Steak/Chicken/Meat Pie)
+  // ★Phase 5.2a (v5.2.1修正): 待機時の攻撃バフ - 同アイテムは1個だけ、複数装備で合算
+  // 装備の各 waitAtkBuff を「同keyごとに集計」して、1つの equip_atk_buff バフにまとめる
+  // 再待機時は turn数 リセット(amount は装備状況から再計算するので同じ)
   if (!u.hasMoved && !u.hasDashed && !u.dead && u.equipBonuses && u.equipBonuses.waitAtkBuffs && u.equipBonuses.waitAtkBuffs.length > 0) {
+    // 同keyごとに集計: {itemKey: {amount: total, turns: maxTurns}}
+    const grouped = {};
     u.equipBonuses.waitAtkBuffs.forEach(buf => {
-      u.statuses.push({
-        type: 'equip_atk_buff',
-        amount: buf.amount,
-        turns: buf.turns,
-      });
+      if (!grouped[buf.key]) {
+        grouped[buf.key] = {amount: 0, turns: 0};
+      }
+      grouped[buf.key].amount += (buf.amount || 0);
+      grouped[buf.key].turns = Math.max(grouped[buf.key].turns, buf.turns || 0);
     });
-    const total = u.equipBonuses.waitAtkBuffs.reduce((sum, b) => sum + (b.amount || 0), 0);
-    addLog(`<span style="color:#ffaa44">${u.name} 待機で攻撃力+${total}!</span>`);
+
+    // 各キーごとに既存バフを探して更新 or 新規追加
+    let totalAmount = 0;
+    Object.keys(grouped).forEach(itemKey => {
+      const g = grouped[itemKey];
+      totalAmount += g.amount;
+      const existing = u.statuses.find(s => s.type === 'equip_atk_buff' && s.sourceKey === itemKey);
+      if (existing) {
+        // 既にバフあり → turns をリフレッシュ(amountは装備不変だから同じ)
+        existing.turns = g.turns;
+        existing.amount = g.amount;  // 念のため再代入
+      } else {
+        // 新規バフ
+        u.statuses.push({
+          type: 'equip_atk_buff',
+          sourceKey: itemKey,
+          amount: g.amount,
+          turns: g.turns,
+        });
+      }
+    });
+
+    addLog(`<span style="color:#ffaa44">${u.name} 待機で攻撃力+${totalAmount}!</span>`);
   }
 
   // ★Phase 5.2a: その場待機時のwait_aoe_st(Pitcher of Ale)
@@ -5130,8 +5184,8 @@ function renderBattle() {
     const statusIconsHTML = u.statuses && u.statuses.length > 0 ? `
       <div class="unit-status-icons">
         ${u.statuses.map(s => {
-          // ★buff_atk と poison はオーラで表現するためアイコン非表示
-          if (s.type === 'buff_atk' || s.type === 'poison') return '';
+          // ★buff_atk / poison / equip_atk_buff はオーラor別UIで表現するためアイコン非表示
+          if (s.type === 'buff_atk' || s.type === 'poison' || s.type === 'equip_atk_buff') return '';
           const def = STATUS_EFFECTS[s.type];
           if (!def) return '';
           // 同種の状態は集約してカウント表示(主に毒)
