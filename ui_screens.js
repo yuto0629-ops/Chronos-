@@ -352,8 +352,11 @@ function showDebugMenu() {
         <button id="debug-unlock-all" style="flex:1; min-width:120px; padding:10px; background:#2a4a2a; border:1px solid #60a060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           全ステージ即解放
         </button>
-        <button id="debug-strong-pt" style="flex:1; min-width:120px; padding:10px; background:#2a3a4a; border:1px solid #6090a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+        <button id="debug-strong-pt-5" style="flex:1; min-width:120px; padding:10px; background:#2a3a4a; border:1px solid #6090a0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           強PT(Lv5×6人)
+        </button>
+        <button id="debug-strong-pt-9" style="flex:1; min-width:120px; padding:10px; background:#3a2a4a; border:1px solid #a060c0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          強PT(Lv9×6人)
         </button>
         <button id="debug-keys-full" style="flex:1; min-width:120px; padding:10px; background:#4a4a2a; border:1px solid #c0c060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           鍵満タン(各3個)
@@ -384,7 +387,7 @@ function showDebugMenu() {
     if (e.target === overlay) overlay.remove();
   });
 
-  // 全解放
+  // 全解放(★メニュー閉じない、連続適用OK)
   document.getElementById('debug-unlock-all').onclick = () => {
     if (!state.available) state.available = [];
     Object.keys(MISSIONS).forEach(id => {
@@ -392,50 +395,51 @@ function showDebugMenu() {
     });
     addLogEquipToast && addLogEquipToast('🛠 全ステージ解放');
     if (typeof renderMap === 'function') renderMap();
-    overlay.remove();
   };
 
-  // 強PT
-  document.getElementById('debug-strong-pt').onclick = () => {
-    if (!confirm('現在のパーティを上書きします。よろしいですか?')) return;
+  // 強PT Lv5(★メニュー閉じない)
+  const buildStrongPT = (lv) => {
+    if (!confirm(`現在のパーティを Lv${lv}×6人 で上書きします。よろしいですか?`)) return;
     state.partyData = [];
     state.party = [];
     const strongClasses = ['champion', 'barbarian', 'archer', 'monk', 'alchemist', 'beastmaster'];
     strongClasses.forEach(cls => {
       const cls_def = CLASSES[cls];
       if (!cls_def) return;
-      const lv = 5;
       const skills = SKILLS[cls] || [];
       const skillLevels = {};
-      skills.forEach((_, i) => { skillLevels[i] = 1; });
+      // Lvに応じてスキルレベルも調整(Lv9なら一部Lv3〜4)
+      skills.forEach((_, i) => {
+        skillLevels[i] = lv >= 9 ? Math.min(Math.floor(lv / 3), 5) : 1;
+      });
       let maxHP = cls_def.hp_base + cls_def.hp_per_level * (lv - 1);
       if (cls_def.hp_override) maxHP = cls_def.hp_override;
       const charName = (CHAR_NAMES[cls] && CHAR_NAMES[cls][0]) || cls;
       state.partyData.push({
         classKey: cls, charName: charName, level: lv,
         hp: maxHP, maxHP: maxHP, exp: 0,
-        equipped: [], skillPoints: 3, skillLevels: skillLevels,
-        passiveLevel: 1, addedSkills: [],
+        equipped: [], skillPoints: lv >= 9 ? 8 : 3, skillLevels: skillLevels,
+        passiveLevel: lv >= 9 ? 3 : 1, addedSkills: [],
       });
       state.party.push(cls);
     });
-    addLogEquipToast && addLogEquipToast('🛠 強PT編成完了(Lv5×6人)');
-    overlay.remove();
+    addLogEquipToast && addLogEquipToast(`🛠 強PT編成完了(Lv${lv}×6人)`);
   };
+  document.getElementById('debug-strong-pt-5').onclick = () => buildStrongPT(5);
+  document.getElementById('debug-strong-pt-9').onclick = () => buildStrongPT(9);
 
-  // 鍵満タン
+  // 鍵満タン(★メニュー閉じない)
   document.getElementById('debug-keys-full').onclick = () => {
     state.keys = { gold: 3, blue: 3 };
     addLogEquipToast && addLogEquipToast('🛠 鍵満タン(GOLD3 / BLUE3)');
     if (typeof renderMap === 'function') renderMap();
-    overlay.remove();
   };
 
-  // リセット
+  // リセット(これは閉じる)
   document.getElementById('debug-reset').onclick = () => {
     if (!confirm('ステートを完全リセットします。本当によろしいですか?')) return;
     state.cleared = [];
-    state.available = ['trivial_plain'];  // 初期解放のみ
+    state.available = ['trivial_plain'];
     state.keys = { gold: 0, blue: 0 };
     state.clearedSubMissions = [];
     state.chestsOpened = [];
