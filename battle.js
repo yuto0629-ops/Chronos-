@@ -227,6 +227,9 @@ function applyEquipment(unit, equippedKeys) {
     counterDazeTurns: 0,   // ★Phase 5.2c-3: 反撃Dazeのターン数
     stCostReduceTemp: 0,   // ★Phase 5.2c-3: 序盤ST消費減量
     stCostReduceTurns: 0,  // ★Phase 5.2c-3: ST消費減の効果ターン数
+    aoeDamage: 0,          // ★Phase 5.3a: ターン開始時 隣接敵に魔法ダメ
+    extraExpChance: 0,     // ★Phase 5.3a: 攻撃ヒット時EXP獲得率(%)
+    extraExpAmount: 0,     // ★Phase 5.3a: 獲得EXP量
     armor: [0, 0, 0],
   };
 
@@ -272,6 +275,10 @@ function applyEquipment(unit, equippedKeys) {
     if (s.counter_daze_turns) unit.equipBonuses.counterDazeTurns = Math.max(unit.equipBonuses.counterDazeTurns, s.counter_daze_turns);
     if (s.st_cost_reduce_temp) unit.equipBonuses.stCostReduceTemp += s.st_cost_reduce_temp;
     if (s.st_cost_reduce_turns) unit.equipBonuses.stCostReduceTurns = Math.max(unit.equipBonuses.stCostReduceTurns, s.st_cost_reduce_turns);
+    // ★Phase 5.3a: ターン開始時aoe魔法ダメ / 攻撃時EXP獲得
+    if (s.aoe_damage) unit.equipBonuses.aoeDamage += s.aoe_damage;
+    if (s.extra_exp_chance) unit.equipBonuses.extraExpChance += s.extra_exp_chance;
+    if (s.extra_exp_amount) unit.equipBonuses.extraExpAmount = Math.max(unit.equipBonuses.extraExpAmount, s.extra_exp_amount);
   });
 }
 
@@ -574,6 +581,27 @@ function startUnitTurn() {
         }
       });
     }
+    // ★Phase 5.3a: ターン開始時に隣接敵に魔法ダメ(摩耗の指輪系)
+    if (u.equipBonuses.aoeDamage > 0) {
+      const dmg = u.equipBonuses.aoeDamage;
+      const adjacentEnemies = battle.units.filter(o =>
+        !o.dead && o.side !== u.side &&
+        Math.abs(o.x - u.x) <= 1 && Math.abs(o.y - u.y) <= 1
+      );
+      adjacentEnemies.forEach(e => {
+        // 魔法防御で軽減
+        const defense = e.armor ? e.armor[2] : 0;
+        const finalDmg = Math.max(1, dmg - defense);
+        const wasAlive = e.hp > 0;
+        e.hp = Math.max(0, e.hp - finalDmg);
+        showDamagePopup(e, finalDmg, false, 'magic');
+        addLog(`<span style="color:#c060c0">${u.name} の装備が発動! ${e.name} に魔法${finalDmg}ダメ</span>`);
+        // 殺した場合の処理
+        if (wasAlive && e.hp === 0 && u.side === 'ally' && !u.isPet) {
+          e.killedBy = u.id;
+        }
+      });
+    }
   }
 
   // ★パッシブ: ヒーラーの auraHealOnTurn(隣接仲間にHP回復)
@@ -844,6 +872,8 @@ function renderCharStats(pd) {
   let atkStunChance = 0, stunTurns = 0;                    // ★Phase 5.2c-2
   let counterDazeChance = 0, counterDazeTurns = 0;         // ★Phase 5.2c-3
   let stCostReduceTemp = 0, stCostReduceTurns = 0;         // ★Phase 5.2c-3
+  let aoeDamage = 0;                                       // ★Phase 5.3a
+  let extraExpChance = 0, extraExpAmount = 0;              // ★Phase 5.3a
 
   (pd.equipped || []).forEach(key => {
     const item = ITEMS[key];
@@ -875,6 +905,9 @@ function renderCharStats(pd) {
     if (s.counter_daze_turns) counterDazeTurns = Math.max(counterDazeTurns, s.counter_daze_turns); // ★Phase 5.2c-3
     if (s.st_cost_reduce_temp) stCostReduceTemp += s.st_cost_reduce_temp;  // ★Phase 5.2c-3
     if (s.st_cost_reduce_turns) stCostReduceTurns = Math.max(stCostReduceTurns, s.st_cost_reduce_turns); // ★Phase 5.2c-3
+    if (s.aoe_damage) aoeDamage += s.aoe_damage;                            // ★Phase 5.3a
+    if (s.extra_exp_chance) extraExpChance += s.extra_exp_chance;           // ★Phase 5.3a
+    if (s.extra_exp_amount) extraExpAmount = Math.max(extraExpAmount, s.extra_exp_amount); // ★Phase 5.3a
   });
 
   // パッシブのarmorBonus
@@ -966,6 +999,8 @@ function renderCharStats(pd) {
   if (atkStunChance > 0) bonusParts.push(`攻撃時Stun${Math.min(100, atkStunChance)}%(${stunTurns}T)`); // ★Phase 5.2c-2
   if (counterDazeChance > 0) bonusParts.push(`反撃Daze${Math.min(100, counterDazeChance)}%(${counterDazeTurns}T)`); // ★Phase 5.2c-3
   if (stCostReduceTemp > 0) bonusParts.push(`序盤ST-${stCostReduceTemp}(${stCostReduceTurns}Tまで)`); // ★Phase 5.2c-3
+  if (aoeDamage > 0) bonusParts.push(`隣接敵に魔法${aoeDamage}/T`);                // ★Phase 5.3a
+  if (extraExpChance > 0) bonusParts.push(`攻撃で${extraExpChance}%EXP+${extraExpAmount}`); // ★Phase 5.3a
 
   const bonusHTML = bonusParts.length > 0
     ? `<div class="char-stats-bonus">⚡ ${bonusParts.join(' / ')}</div>`
@@ -1751,6 +1786,8 @@ function showUnitStatusPopup(u) {
     if (eb.attackStunChance > 0) parts.push(`攻撃時Stun${Math.min(100, eb.attackStunChance)}%`);   // ★Phase 5.2c-2
     if (eb.counterDazeChance > 0) parts.push(`反撃Daze${Math.min(100, eb.counterDazeChance)}%`);  // ★Phase 5.2c-3
     if (eb.stCostReduceTemp > 0) parts.push(`序盤ST-${eb.stCostReduceTemp}(~${eb.stCostReduceTurns}T)`); // ★Phase 5.2c-3
+    if (eb.aoeDamage > 0) parts.push(`隣接敵に魔法${eb.aoeDamage}/T`);                // ★Phase 5.3a
+    if (eb.extraExpChance > 0) parts.push(`${eb.extraExpChance}%EXP+${eb.extraExpAmount}`); // ★Phase 5.3a
     if (parts.length > 0) {
       equipInfo = `<div class="usp-equip">⚡ ${parts.join(' / ')}</div>`;
     }
@@ -2666,6 +2703,20 @@ function applyDamage(attacker, target, skill) {
           }
           addLog(`<span style="color:#c4a8e8">${target.name} の装備が発動! ${attacker.name} がDaze!(${tb.counterDazeTurns}T)</span>`);
         }
+      }
+    }
+  }
+
+  // ★Phase 5.3a: 攻撃ヒット時の追加EXP獲得(幸運のコイン)
+  if (totalDamage > 0 && attacker.equipBonuses && attacker.equipBonuses.extraExpChance > 0 && attacker.side === 'ally' && !attacker.isPet) {
+    const chance = Math.min(100, attacker.equipBonuses.extraExpChance);
+    if (Math.random() * 100 < chance) {
+      const amount = attacker.equipBonuses.extraExpAmount || 10;
+      // partyData側に直接EXP加算
+      const pd = state.partyData.find(p => p.charName === attacker.charName || p.classKey === attacker.classKey);
+      if (pd) {
+        pd.exp = (pd.exp || 0) + amount;
+        addLog(`<span style="color:#ffd060">💰 ${attacker.name} 幸運発動! EXP+${amount}</span>`);
       }
     }
   }
