@@ -230,6 +230,11 @@ function applyEquipment(unit, equippedKeys) {
     aoeDamage: 0,          // ★Phase 5.3a: ターン開始時 隣接敵に魔法ダメ
     extraExpChance: 0,     // ★Phase 5.3a: 攻撃ヒット時EXP獲得率(%)
     extraExpAmount: 0,     // ★Phase 5.3a: 獲得EXP量
+    reflectDmgChance: 0,   // ★Phase 5.3b: 被ダメ反射の発動率(%)
+    reflectDmgRatio: 0,    // ★Phase 5.3b: 反射ダメージの割合(1.0=同ダメ)
+    reflectMeleeFixed: 0,  // ★Phase 5.3b: 近接被弾時の固定反射ダメ
+    aoeAtkBuff: 0,         // ★Phase 5.3b: 隣接味方への攻撃力バフ
+    lifestealRatio: 0,     // ★Phase 5.3b: 与ダメ→HP吸収率(%)
     armor: [0, 0, 0],
   };
 
@@ -279,6 +284,12 @@ function applyEquipment(unit, equippedKeys) {
     if (s.aoe_damage) unit.equipBonuses.aoeDamage += s.aoe_damage;
     if (s.extra_exp_chance) unit.equipBonuses.extraExpChance += s.extra_exp_chance;
     if (s.extra_exp_amount) unit.equipBonuses.extraExpAmount = Math.max(unit.equipBonuses.extraExpAmount, s.extra_exp_amount);
+    // ★Phase 5.3b: 反射・吸収・隣接バフ
+    if (s.reflect_dmg_chance) unit.equipBonuses.reflectDmgChance += s.reflect_dmg_chance;
+    if (s.reflect_dmg_ratio) unit.equipBonuses.reflectDmgRatio = Math.max(unit.equipBonuses.reflectDmgRatio, s.reflect_dmg_ratio);
+    if (s.reflect_melee_fixed) unit.equipBonuses.reflectMeleeFixed += s.reflect_melee_fixed;
+    if (s.aoe_atk_buff) unit.equipBonuses.aoeAtkBuff += s.aoe_atk_buff;
+    if (s.lifesteal_ratio) unit.equipBonuses.lifestealRatio += s.lifesteal_ratio;
   });
 }
 
@@ -874,6 +885,10 @@ function renderCharStats(pd) {
   let stCostReduceTemp = 0, stCostReduceTurns = 0;         // ★Phase 5.2c-3
   let aoeDamage = 0;                                       // ★Phase 5.3a
   let extraExpChance = 0, extraExpAmount = 0;              // ★Phase 5.3a
+  let reflectDmgChance = 0, reflectDmgRatio = 0;           // ★Phase 5.3b
+  let reflectMeleeFixed = 0;                               // ★Phase 5.3b
+  let aoeAtkBuff = 0;                                      // ★Phase 5.3b
+  let lifestealRatio = 0;                                  // ★Phase 5.3b
 
   (pd.equipped || []).forEach(key => {
     const item = ITEMS[key];
@@ -908,6 +923,11 @@ function renderCharStats(pd) {
     if (s.aoe_damage) aoeDamage += s.aoe_damage;                            // ★Phase 5.3a
     if (s.extra_exp_chance) extraExpChance += s.extra_exp_chance;           // ★Phase 5.3a
     if (s.extra_exp_amount) extraExpAmount = Math.max(extraExpAmount, s.extra_exp_amount); // ★Phase 5.3a
+    if (s.reflect_dmg_chance) reflectDmgChance += s.reflect_dmg_chance;     // ★Phase 5.3b
+    if (s.reflect_dmg_ratio) reflectDmgRatio = Math.max(reflectDmgRatio, s.reflect_dmg_ratio); // ★Phase 5.3b
+    if (s.reflect_melee_fixed) reflectMeleeFixed += s.reflect_melee_fixed;  // ★Phase 5.3b
+    if (s.aoe_atk_buff) aoeAtkBuff += s.aoe_atk_buff;                       // ★Phase 5.3b
+    if (s.lifesteal_ratio) lifestealRatio += s.lifesteal_ratio;             // ★Phase 5.3b
   });
 
   // パッシブのarmorBonus
@@ -1001,6 +1021,10 @@ function renderCharStats(pd) {
   if (stCostReduceTemp > 0) bonusParts.push(`序盤ST-${stCostReduceTemp}(${stCostReduceTurns}Tまで)`); // ★Phase 5.2c-3
   if (aoeDamage > 0) bonusParts.push(`隣接敵に魔法${aoeDamage}/T`);                // ★Phase 5.3a
   if (extraExpChance > 0) bonusParts.push(`攻撃で${extraExpChance}%EXP+${extraExpAmount}`); // ★Phase 5.3a
+  if (reflectDmgChance > 0) bonusParts.push(`被ダメ${reflectDmgChance}%で${Math.floor(reflectDmgRatio*100)}%反射`); // ★Phase 5.3b
+  if (reflectMeleeFixed > 0) bonusParts.push(`近接被弾時${reflectMeleeFixed}反射`); // ★Phase 5.3b
+  if (aoeAtkBuff > 0) bonusParts.push(`隣接味方の攻撃+${aoeAtkBuff}`);             // ★Phase 5.3b
+  if (lifestealRatio > 0) bonusParts.push(`与ダメ${lifestealRatio}%吸収`);         // ★Phase 5.3b
 
   const bonusHTML = bonusParts.length > 0
     ? `<div class="char-stats-bonus">⚡ ${bonusParts.join(' / ')}</div>`
@@ -1788,6 +1812,10 @@ function showUnitStatusPopup(u) {
     if (eb.stCostReduceTemp > 0) parts.push(`序盤ST-${eb.stCostReduceTemp}(~${eb.stCostReduceTurns}T)`); // ★Phase 5.2c-3
     if (eb.aoeDamage > 0) parts.push(`隣接敵に魔法${eb.aoeDamage}/T`);                // ★Phase 5.3a
     if (eb.extraExpChance > 0) parts.push(`${eb.extraExpChance}%EXP+${eb.extraExpAmount}`); // ★Phase 5.3a
+    if (eb.reflectDmgChance > 0) parts.push(`被ダメ${eb.reflectDmgChance}%反射`);    // ★Phase 5.3b
+    if (eb.reflectMeleeFixed > 0) parts.push(`近接被弾${eb.reflectMeleeFixed}反射`); // ★Phase 5.3b
+    if (eb.aoeAtkBuff > 0) parts.push(`隣接味方攻撃+${eb.aoeAtkBuff}`);              // ★Phase 5.3b
+    if (eb.lifestealRatio > 0) parts.push(`与ダメ${eb.lifestealRatio}%吸収`);        // ★Phase 5.3b
     if (parts.length > 0) {
       equipInfo = `<div class="usp-equip">⚡ ${parts.join(' / ')}</div>`;
     }
@@ -2483,6 +2511,17 @@ function applyDamage(attacker, target, skill) {
   attacker.statuses.filter(s => s.type === 'equip_atk_buff').forEach(s => {
     atkBoost += (s.amount || 0);
   });
+  // ★Phase 5.3b: 隣接味方の Battle Banner からのバフ
+  if (typeof battle !== 'undefined' && battle.units) {
+    const adjacentBannerHolders = battle.units.filter(o =>
+      !o.dead && o.side === attacker.side && o.id !== attacker.id &&
+      o.equipBonuses && o.equipBonuses.aoeAtkBuff > 0 &&
+      Math.abs(o.x - attacker.x) <= 1 && Math.abs(o.y - attacker.y) <= 1
+    );
+    adjacentBannerHolders.forEach(banner => {
+      atkBoost += banner.equipBonuses.aoeAtkBuff;
+    });
+  }
 
   // 防御計算: 対応軸 - armor_down状態の効果
   const armorIdx = skill.type === 'M' ? 0 : (skill.type === 'R' ? 1 : 2);
@@ -2702,6 +2741,49 @@ function applyDamage(attacker, target, skill) {
             });
           }
           addLog(`<span style="color:#c4a8e8">${target.name} の装備が発動! ${attacker.name} がDaze!(${tb.counterDazeTurns}T)</span>`);
+        }
+      }
+    }
+  }
+
+  // ★Phase 5.3b: 与ダメ→HP吸収(吸血の牙)
+  if (totalDamage > 0 && attacker.hp > 0 && attacker.equipBonuses && attacker.equipBonuses.lifestealRatio > 0) {
+    const healAmount = Math.max(1, Math.floor(totalDamage * attacker.equipBonuses.lifestealRatio / 100));
+    if (attacker.hp < attacker.maxHP) {
+      const before = attacker.hp;
+      attacker.hp = Math.min(attacker.maxHP, attacker.hp + healAmount);
+      const actualHeal = attacker.hp - before;
+      if (actualHeal > 0) {
+        showHealPopup(attacker, actualHeal);
+        addLog(`<span style="color:#e06060">🩸 ${attacker.name} 吸血! HP+${actualHeal}</span>`);
+      }
+    }
+  }
+
+  // ★Phase 5.3b: 被ダメ反射(呪いの人形 / 荊の外套)
+  if (totalDamage > 0 && target.hp > 0 && attacker.hp > 0 && target.equipBonuses) {
+    let reflectDmg = 0;
+    // 呪いの人形: 確率発動の割合反射
+    if (target.equipBonuses.reflectDmgChance > 0) {
+      const chance = Math.min(100, target.equipBonuses.reflectDmgChance);
+      if (Math.random() * 100 < chance) {
+        reflectDmg += Math.floor(totalDamage * (target.equipBonuses.reflectDmgRatio || 1.0));
+      }
+    }
+    // 荊の外套: 近接被弾時の固定反射(常時)
+    if (target.equipBonuses.reflectMeleeFixed > 0 && skill.type === 'M') {
+      reflectDmg += target.equipBonuses.reflectMeleeFixed;
+    }
+    if (reflectDmg > 0) {
+      // 防御無視で反射
+      const wasAlive = attacker.hp > 0;
+      attacker.hp = Math.max(0, attacker.hp - reflectDmg);
+      showDamagePopup(attacker, reflectDmg, false, 'reflect');
+      addLog(`<span style="color:#ff8866">🌵 ${target.name} 反射ダメージ! ${attacker.name} に ${reflectDmg}</span>`);
+      if (wasAlive && attacker.hp === 0) {
+        addLog(`<span style="color:#ff6060">${attacker.name} は反射ダメージで倒れた!</span>`);
+        if (target.side === 'ally' && !target.isPet) {
+          attacker.killedBy = target.id;
         }
       }
     }
