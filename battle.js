@@ -218,6 +218,11 @@ function applyEquipment(unit, equippedKeys) {
     statusResist: 0,  // ★Phase 5.2c-1: Stun/Daze/Slow 無効率(%)
     poisonResist: 0,  // ★Phase 5.2c-1: 毒 無効率(%)
     critResist: 0,    // ★Phase 5.2c-1: 被Crit 無効率(%)
+    attackPoisonChance: 0, // ★Phase 5.2c-2: 攻撃時の毒付与率(%)
+    poisonDmg: 0,          // ★Phase 5.2c-2: 付与する毒のダメージ
+    poisonTurns: 0,        // ★Phase 5.2c-2: 付与する毒のターン数
+    attackStunChance: 0,   // ★Phase 5.2c-2: 攻撃時のStun付与率(%)
+    stunTurns: 0,          // ★Phase 5.2c-2: 付与するStunのターン数
     armor: [0, 0, 0],
   };
 
@@ -252,6 +257,12 @@ function applyEquipment(unit, equippedKeys) {
     if (s.status_resist) unit.equipBonuses.statusResist += s.status_resist; // ★Phase 5.2c-1
     if (s.poison_resist) unit.equipBonuses.poisonResist += s.poison_resist; // ★Phase 5.2c-1
     if (s.crit_resist)   unit.equipBonuses.critResist += s.crit_resist;     // ★Phase 5.2c-1
+    // ★Phase 5.2c-2: 攻撃時の状態異常付与(複数装備時はchance加算、dmg/turnsはmax)
+    if (s.attack_poison_chance) unit.equipBonuses.attackPoisonChance += s.attack_poison_chance;
+    if (s.poison_dmg)    unit.equipBonuses.poisonDmg = Math.max(unit.equipBonuses.poisonDmg, s.poison_dmg);
+    if (s.poison_turns)  unit.equipBonuses.poisonTurns = Math.max(unit.equipBonuses.poisonTurns, s.poison_turns);
+    if (s.attack_stun_chance) unit.equipBonuses.attackStunChance += s.attack_stun_chance;
+    if (s.stun_turns)    unit.equipBonuses.stunTurns = Math.max(unit.equipBonuses.stunTurns, s.stun_turns);
   });
 }
 
@@ -806,6 +817,8 @@ function renderCharStats(pd) {
   let waitAtkBuffs = []; // ★Phase 5.2a [{amount, turns}, ...]
   let waitAoeST = 0;     // ★Phase 5.2a
   let statusResist = 0, poisonResist = 0, critResist = 0; // ★Phase 5.2c-1
+  let atkPoisonChance = 0, poisonDmg = 0, poisonTurns = 0; // ★Phase 5.2c-2
+  let atkStunChance = 0, stunTurns = 0;                    // ★Phase 5.2c-2
 
   (pd.equipped || []).forEach(key => {
     const item = ITEMS[key];
@@ -828,6 +841,11 @@ function renderCharStats(pd) {
     if (s.status_resist) statusResist += s.status_resist;     // ★Phase 5.2c-1
     if (s.poison_resist) poisonResist += s.poison_resist;     // ★Phase 5.2c-1
     if (s.crit_resist) critResist += s.crit_resist;           // ★Phase 5.2c-1
+    if (s.attack_poison_chance) atkPoisonChance += s.attack_poison_chance; // ★Phase 5.2c-2
+    if (s.poison_dmg) poisonDmg = Math.max(poisonDmg, s.poison_dmg);       // ★Phase 5.2c-2
+    if (s.poison_turns) poisonTurns = Math.max(poisonTurns, s.poison_turns); // ★Phase 5.2c-2
+    if (s.attack_stun_chance) atkStunChance += s.attack_stun_chance;       // ★Phase 5.2c-2
+    if (s.stun_turns) stunTurns = Math.max(stunTurns, s.stun_turns);       // ★Phase 5.2c-2
   });
 
   // パッシブのarmorBonus
@@ -915,6 +933,8 @@ function renderCharStats(pd) {
   if (statusResist > 0) bonusParts.push(`異常耐性${Math.min(100, statusResist)}%`);  // ★Phase 5.2c-1
   if (poisonResist > 0) bonusParts.push(`毒耐性${Math.min(100, poisonResist)}%`);    // ★Phase 5.2c-1
   if (critResist > 0) bonusParts.push(`Crit耐性${Math.min(100, critResist)}%`);      // ★Phase 5.2c-1
+  if (atkPoisonChance > 0) bonusParts.push(`攻撃時毒${Math.min(100, atkPoisonChance)}%(${poisonDmg}/${poisonTurns}T)`); // ★Phase 5.2c-2
+  if (atkStunChance > 0) bonusParts.push(`攻撃時Stun${Math.min(100, atkStunChance)}%(${stunTurns}T)`); // ★Phase 5.2c-2
 
   const bonusHTML = bonusParts.length > 0
     ? `<div class="char-stats-bonus">⚡ ${bonusParts.join(' / ')}</div>`
@@ -1696,6 +1716,8 @@ function showUnitStatusPopup(u) {
     if (eb.statusResist > 0) parts.push(`異常耐性${Math.min(100, eb.statusResist)}%`);  // ★Phase 5.2c-1
     if (eb.poisonResist > 0) parts.push(`毒耐性${Math.min(100, eb.poisonResist)}%`);    // ★Phase 5.2c-1
     if (eb.critResist > 0) parts.push(`Crit耐性${Math.min(100, eb.critResist)}%`);      // ★Phase 5.2c-1
+    if (eb.attackPoisonChance > 0) parts.push(`攻撃時毒${Math.min(100, eb.attackPoisonChance)}%`); // ★Phase 5.2c-2
+    if (eb.attackStunChance > 0) parts.push(`攻撃時Stun${Math.min(100, eb.attackStunChance)}%`);   // ★Phase 5.2c-2
     if (parts.length > 0) {
       equipInfo = `<div class="usp-equip">⚡ ${parts.join(' / ')}</div>`;
     }
@@ -2514,6 +2536,71 @@ function applyDamage(attacker, target, skill) {
   const breakdownStr = bonusBreakdown.length > 0 ? ` <span style="font-size:9px;opacity:0.85;">[${bonusBreakdown.join(' ')}]</span>` : '';
 
   addLog(`${attacker.name} の${skill.name}! ${target.name} に ${totalDamage}${hitsStr}${critStr}${dazeNote}${breakdownStr}`);
+
+  // ★Phase 5.2c-2: 装備による攻撃時状態異常付与(攻撃が当たって対象が生存している時のみ)
+  if (totalDamage > 0 && target.hp > 0 && attacker.equipBonuses) {
+    const eb = attacker.equipBonuses;
+    // 毒付与判定
+    if (eb.attackPoisonChance > 0) {
+      const chance = Math.min(100, eb.attackPoisonChance);
+      if (Math.random() * 100 < chance) {
+        // 既に毒があれば dmg/turns の強い方を採用
+        const existing = target.statuses.find(s => s.type === 'poison');
+        if (existing) {
+          existing.dmg = Math.max(existing.dmg || 0, eb.poisonDmg);
+          existing.turns = Math.max(existing.turns || 0, eb.poisonTurns);
+        } else {
+          // ★耐性チェック(装備の毒耐性 or パッシブ)
+          let resisted = false;
+          if (target.equipBonuses && target.equipBonuses.poisonResist > 0) {
+            if (Math.random() * 100 < target.equipBonuses.poisonResist) resisted = true;
+          }
+          if (!resisted && target.passive && target.passive.statusResist) {
+            if (Math.random() * 100 < target.passive.statusResist) resisted = true;
+          }
+          if (resisted) {
+            addLog(`<span style="color:#88ddff">${target.name} は毒を無効化!</span>`);
+          } else {
+            target.statuses.push({
+              type: 'poison',
+              dmg: eb.poisonDmg,
+              turns: eb.poisonTurns,
+            });
+            addLog(`<span style="color:#a8e060">${target.name} に毒付与(${eb.poisonDmg}/T×${eb.poisonTurns}T)</span>`);
+          }
+        }
+      }
+    }
+    // Stun付与判定
+    if (eb.attackStunChance > 0) {
+      const chance = Math.min(100, eb.attackStunChance);
+      if (Math.random() * 100 < chance) {
+        // ★耐性チェック
+        let resisted = false;
+        if (target.equipBonuses && target.equipBonuses.statusResist > 0) {
+          if (Math.random() * 100 < target.equipBonuses.statusResist) resisted = true;
+        }
+        if (!resisted && target.passive && target.passive.statusResist) {
+          if (Math.random() * 100 < target.passive.statusResist) resisted = true;
+        }
+        if (resisted) {
+          addLog(`<span style="color:#88ddff">${target.name} はStunを無効化!</span>`);
+        } else {
+          // Stunは1個だけ、既存があればturnsをmaxに
+          const existing = target.statuses.find(s => s.type === 'stun');
+          if (existing) {
+            existing.turns = Math.max(existing.turns, eb.stunTurns);
+          } else {
+            target.statuses.push({
+              type: 'stun',
+              turns: eb.stunTurns,
+            });
+          }
+          addLog(`<span style="color:#ffee44">${target.name} がStun!(${eb.stunTurns}T)</span>`);
+        }
+      }
+    }
+  }
 
   // ====== 視覚演出 ======
   // 攻撃モーション(攻撃者が前進)
