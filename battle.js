@@ -1008,6 +1008,7 @@ function renderCharDetail() {
   const hpPct = (pd.hp / pd.maxHP) * 100;
 
   // アイテムスロット(最大3つ)
+  // ★Phase 5.2c (UI改善): スロットタップで詳細ポップアップを開く方式に変更
   const slots = [0, 1, 2].map(i => {
     const itemKey = pd.equipped[i];
     if (!itemKey) {
@@ -1021,35 +1022,17 @@ function renderCharDetail() {
     const item = ITEMS[itemKey];
     const colorClass = `color-${item.color}`;
     const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
-    const selected = (i === selectedItemSlotIdx) ? 'selected' : '';
     return `
-      <div class="char-item-slot ${selected}" onclick="selectItemSlot(${i})">
+      <div class="char-item-slot" onclick="showItemSlotPopup(${i})">
         <div class="char-item-label">Item ${i + 1}:</div>
         <div class="char-item-icon ${colorClass}">${icon}</div>
+        <div style="font-size:8px; color:#d4a020; text-align:center; margin-top:2px;">${item.name_ja}</div>
       </div>
     `;
   }).join('');
 
-  // 中央下: アイテム詳細
-  let itemDetailHTML;
-  if (selectedItemSlotIdx >= 0 && pd.equipped[selectedItemSlotIdx]) {
-    const item = ITEMS[pd.equipped[selectedItemSlotIdx]];
-    itemDetailHTML = `
-      <div class="char-item-detail-header">
-        <div class="char-item-detail-name">${item.name_ja}</div>
-        <div class="char-item-detail-value">Value: ${item.value}</div>
-      </div>
-      <div class="char-item-detail-text">${item.effect}</div>
-      <button class="btn" onclick="unequipItem(${selectedItemSlotIdx})" style="margin-top: 4px; font-size: 9px; padding: 3px 8px;">外す</button>
-    `;
-  } else {
-    itemDetailHTML = `
-      <div class="char-item-detail-text" style="color: #5a4a30;">
-        アイテムを選択すると詳細が表示されます<br>
-        空きスロットをタップで装備可能
-      </div>
-    `;
-  }
+  // 中央下: アイテム詳細(★Phase 5.2c: ポップアップ化のため空に)
+  let itemDetailHTML = '';
 
   // スキル分類: 攻撃 / パッシブ
   // ★バフ・自分対象スキル(damage=0, range=0)も含める。passiveフラグなし=アクティブスキル全部
@@ -1520,7 +1503,78 @@ function unequipItem(slotIdx) {
   const pd = state.partyData[charDetailIdx];
   pd.equipped.splice(slotIdx, 1);
   selectedItemSlotIdx = -1;
+  // ポップアップが開いてれば閉じる
+  document.querySelectorAll('.item-slot-popup').forEach(o => o.remove());
   renderCharDetail();
+}
+
+// ★Phase 5.2c: 装備中スロットのアクションポップアップ
+function showItemSlotPopup(slotIdx) {
+  const pd = state.partyData[charDetailIdx];
+  const itemKey = pd.equipped[slotIdx];
+  if (!itemKey) return;
+  const item = ITEMS[itemKey];
+
+  document.querySelectorAll('.item-slot-popup').forEach(o => o.remove());
+
+  const colorBg = { orange: '#5a3a1a', blue: '#1a3a5a', pink: '#5a1a4a' }[item.color];
+  const colorBorder = { orange: '#d4a020', blue: '#60a0d4', pink: '#d460a0' }[item.color];
+  const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'item-slot-popup';
+  overlay.style.cssText = `
+    position:fixed; top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.7); z-index:9999;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  `;
+
+  overlay.innerHTML = `
+    <div style="background:#1a1a1a; border:2px solid ${colorBorder}; border-radius:8px;
+                padding:18px 20px; max-width:380px; width:92%;
+                box-shadow:0 0 30px ${colorBorder}66;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;
+                  padding-bottom:10px; border-bottom:1px solid #444;">
+        <div style="width:48px; height:48px; background:${colorBg}; border:1px solid ${colorBorder};
+                    border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:24px;">${icon}</div>
+        <div style="flex:1;">
+          <div style="font-size:14px; font-weight:800; color:#fff;">${item.name_ja}</div>
+          <div style="font-size:9px; color:#d4a020; margin-top:2px;">★ Value: ${item.value}</div>
+        </div>
+      </div>
+      <div style="font-size:12px; color:#d4c5a9; line-height:1.6; margin-bottom:14px;
+                  background:rgba(0,0,0,0.4); padding:10px; border-radius:4px;">
+        ${item.effect}
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button id="popup-swap" style="flex:1; padding:8px; background:#2a4a6a; border:1px solid #60a0d4;
+                color:#fff; cursor:pointer; border-radius:4px; font-size:11px; font-weight:700;">
+          🔄 交換
+        </button>
+        <button id="popup-unequip" style="flex:1; padding:8px; background:#6a2a2a; border:1px solid #c06060;
+                color:#fff; cursor:pointer; border-radius:4px; font-size:11px; font-weight:700;">
+          ✕ 外す
+        </button>
+        <button id="popup-close" style="flex:1; padding:8px; background:#3a3a3a; border:1px solid #6a6a6a;
+                color:#fff; cursor:pointer; border-radius:4px; font-size:11px; font-weight:700;">
+          閉じる
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('popup-close').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById('popup-unequip').onclick = () => {
+    unequipItem(slotIdx);
+  };
+  document.getElementById('popup-swap').onclick = () => {
+    overlay.remove();
+    openInvPicker(slotIdx); // インベントリピッカー表示(置き換えモード)
+  };
 }
 
 // ====== インベントリピッカー(空きスロットからアイテムを装備) ======
@@ -1540,9 +1594,14 @@ function openInvPicker(slotIdx) {
 
   const overlay = document.createElement('div');
   overlay.className = 'inv-picker';
+  // ★Phase 5.2c: 既装備スロットなら「交換」、空きなら「装備」と明示
+  const isSwap = !!pd.equipped[slotIdx];
+  const titleText = isSwap
+    ? `Item ${slotIdx + 1} を交換`
+    : `Item ${slotIdx + 1} に装備`;
   overlay.innerHTML = `
     <div class="inv-picker-content">
-      <div class="inv-picker-title">Item ${slotIdx + 1} に装備</div>
+      <div class="inv-picker-title">${titleText}</div>
       <div class="inv-picker-list" id="inv-picker-list"></div>
       <button class="btn" onclick="closeInvPicker()" style="width: 100%; font-size: 11px; padding: 6px;">キャンセル</button>
     </div>
