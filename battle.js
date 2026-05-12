@@ -223,6 +223,10 @@ function applyEquipment(unit, equippedKeys) {
     poisonTurns: 0,        // ★Phase 5.2c-2: 付与する毒のターン数
     attackStunChance: 0,   // ★Phase 5.2c-2: 攻撃時のStun付与率(%)
     stunTurns: 0,          // ★Phase 5.2c-2: 付与するStunのターン数
+    counterDazeChance: 0,  // ★Phase 5.2c-3: 被攻撃時の反撃Daze率(%)
+    counterDazeTurns: 0,   // ★Phase 5.2c-3: 反撃Dazeのターン数
+    stCostReduceTemp: 0,   // ★Phase 5.2c-3: 序盤ST消費減量
+    stCostReduceTurns: 0,  // ★Phase 5.2c-3: ST消費減の効果ターン数
     armor: [0, 0, 0],
   };
 
@@ -263,6 +267,11 @@ function applyEquipment(unit, equippedKeys) {
     if (s.poison_turns)  unit.equipBonuses.poisonTurns = Math.max(unit.equipBonuses.poisonTurns, s.poison_turns);
     if (s.attack_stun_chance) unit.equipBonuses.attackStunChance += s.attack_stun_chance;
     if (s.stun_turns)    unit.equipBonuses.stunTurns = Math.max(unit.equipBonuses.stunTurns, s.stun_turns);
+    // ★Phase 5.2c-3: 反撃Daze + 序盤ST消費減
+    if (s.counter_daze_chance) unit.equipBonuses.counterDazeChance += s.counter_daze_chance;
+    if (s.counter_daze_turns) unit.equipBonuses.counterDazeTurns = Math.max(unit.equipBonuses.counterDazeTurns, s.counter_daze_turns);
+    if (s.st_cost_reduce_temp) unit.equipBonuses.stCostReduceTemp += s.st_cost_reduce_temp;
+    if (s.st_cost_reduce_turns) unit.equipBonuses.stCostReduceTurns = Math.max(unit.equipBonuses.stCostReduceTurns, s.st_cost_reduce_turns);
   });
 }
 
@@ -673,6 +682,20 @@ function processStatusEffects(unit) {
   return skipTurn;
 }
 
+// ====== ★Phase 5.2c-3: 装備による実効ST消費 ======
+// Oil of Fury等の効果を考慮した、実際のスキルST消費を返す
+function getEffectiveSkillCost(unit, skill) {
+  let cost = skill.cost;
+  if (unit.equipBonuses && unit.equipBonuses.stCostReduceTemp > 0 && unit.equipBonuses.stCostReduceTurns > 0) {
+    // 戦闘経過ターン <= 効果ターン数 なら割引適用
+    const turn = (typeof battle !== 'undefined' && battle.turn) ? battle.turn : 1;
+    if (turn <= unit.equipBonuses.stCostReduceTurns) {
+      cost = Math.max(1, cost - unit.equipBonuses.stCostReduceTemp);
+    }
+  }
+  return cost;
+}
+
 // ====== ターン終了時に状態異常のターン数を減らす ======
 function decrementStatuses(unit) {
   unit.statuses = unit.statuses.filter(s => {
@@ -819,6 +842,8 @@ function renderCharStats(pd) {
   let statusResist = 0, poisonResist = 0, critResist = 0; // ★Phase 5.2c-1
   let atkPoisonChance = 0, poisonDmg = 0, poisonTurns = 0; // ★Phase 5.2c-2
   let atkStunChance = 0, stunTurns = 0;                    // ★Phase 5.2c-2
+  let counterDazeChance = 0, counterDazeTurns = 0;         // ★Phase 5.2c-3
+  let stCostReduceTemp = 0, stCostReduceTurns = 0;         // ★Phase 5.2c-3
 
   (pd.equipped || []).forEach(key => {
     const item = ITEMS[key];
@@ -846,6 +871,10 @@ function renderCharStats(pd) {
     if (s.poison_turns) poisonTurns = Math.max(poisonTurns, s.poison_turns); // ★Phase 5.2c-2
     if (s.attack_stun_chance) atkStunChance += s.attack_stun_chance;       // ★Phase 5.2c-2
     if (s.stun_turns) stunTurns = Math.max(stunTurns, s.stun_turns);       // ★Phase 5.2c-2
+    if (s.counter_daze_chance) counterDazeChance += s.counter_daze_chance; // ★Phase 5.2c-3
+    if (s.counter_daze_turns) counterDazeTurns = Math.max(counterDazeTurns, s.counter_daze_turns); // ★Phase 5.2c-3
+    if (s.st_cost_reduce_temp) stCostReduceTemp += s.st_cost_reduce_temp;  // ★Phase 5.2c-3
+    if (s.st_cost_reduce_turns) stCostReduceTurns = Math.max(stCostReduceTurns, s.st_cost_reduce_turns); // ★Phase 5.2c-3
   });
 
   // パッシブのarmorBonus
@@ -935,6 +964,8 @@ function renderCharStats(pd) {
   if (critResist > 0) bonusParts.push(`Crit耐性${Math.min(100, critResist)}%`);      // ★Phase 5.2c-1
   if (atkPoisonChance > 0) bonusParts.push(`攻撃時毒${Math.min(100, atkPoisonChance)}%(${poisonDmg}/${poisonTurns}T)`); // ★Phase 5.2c-2
   if (atkStunChance > 0) bonusParts.push(`攻撃時Stun${Math.min(100, atkStunChance)}%(${stunTurns}T)`); // ★Phase 5.2c-2
+  if (counterDazeChance > 0) bonusParts.push(`反撃Daze${Math.min(100, counterDazeChance)}%(${counterDazeTurns}T)`); // ★Phase 5.2c-3
+  if (stCostReduceTemp > 0) bonusParts.push(`序盤ST-${stCostReduceTemp}(${stCostReduceTurns}Tまで)`); // ★Phase 5.2c-3
 
   const bonusHTML = bonusParts.length > 0
     ? `<div class="char-stats-bonus">⚡ ${bonusParts.join(' / ')}</div>`
@@ -1718,6 +1749,8 @@ function showUnitStatusPopup(u) {
     if (eb.critResist > 0) parts.push(`Crit耐性${Math.min(100, eb.critResist)}%`);      // ★Phase 5.2c-1
     if (eb.attackPoisonChance > 0) parts.push(`攻撃時毒${Math.min(100, eb.attackPoisonChance)}%`); // ★Phase 5.2c-2
     if (eb.attackStunChance > 0) parts.push(`攻撃時Stun${Math.min(100, eb.attackStunChance)}%`);   // ★Phase 5.2c-2
+    if (eb.counterDazeChance > 0) parts.push(`反撃Daze${Math.min(100, eb.counterDazeChance)}%`);  // ★Phase 5.2c-3
+    if (eb.stCostReduceTemp > 0) parts.push(`序盤ST-${eb.stCostReduceTemp}(~${eb.stCostReduceTurns}T)`); // ★Phase 5.2c-3
     if (parts.length > 0) {
       equipInfo = `<div class="usp-equip">⚡ ${parts.join(' / ')}</div>`;
     }
@@ -1901,7 +1934,9 @@ function showSkillModal(unit) {
   unit.skills.forEach((skill, idx) => {
     // ★未習得スキル(skillLevels[idx] === 0)は表示しない
     if (unit.skillLevels && unit.skillLevels[idx] === 0) return;
-    const canAfford = unit.st >= skill.cost;
+    const effectiveCost = getEffectiveSkillCost(unit, skill);
+    const canAfford = unit.st >= effectiveCost;
+    const isDiscounted = effectiveCost < skill.cost;
     const item = document.createElement('div');
     item.className = `skill-item ${!canAfford ? 'disabled' : ''}`;
 
@@ -1955,7 +1990,7 @@ function showSkillModal(unit) {
         </div>
       </div>
       <div class="skill-cost">
-        <div class="skill-cost-st">${skill.cost}</div>
+        <div class="skill-cost-st" style="${isDiscounted ? 'color:#ffaa44;' : ''}">${effectiveCost}${isDiscounted ? ` <span style="font-size:9px; text-decoration:line-through; color:#666;">${skill.cost}</span>` : ''}</div>
         <div class="skill-cost-label">ST</div>
       </div>
     `;
@@ -2203,7 +2238,7 @@ function executeSkill(attacker, tx, ty, targetUnit, targetCrate) {
   const skill = battle.selectedSkill;
   if (!skill) return;
 
-  attacker.st -= skill.cost;
+  attacker.st -= getEffectiveSkillCost(attacker, skill);
   attacker.hasAttacked = true;
   battle.attackMode = false;
   battle.aoeAimAt = null;  // ★範囲攻撃プレビューもクリア
@@ -2597,6 +2632,39 @@ function applyDamage(attacker, target, skill) {
             });
           }
           addLog(`<span style="color:#ffee44">${target.name} がStun!(${eb.stunTurns}T)</span>`);
+        }
+      }
+    }
+  }
+
+  // ★Phase 5.2c-3: 反撃Daze(被攻撃側の装備で発動)
+  // 攻撃した側(=attacker)を Daze 化する
+  if (totalDamage > 0 && attacker.hp > 0 && target.hp > 0 && target.equipBonuses) {
+    const tb = target.equipBonuses;
+    if (tb.counterDazeChance > 0) {
+      const chance = Math.min(100, tb.counterDazeChance);
+      if (Math.random() * 100 < chance) {
+        // 攻撃者側の耐性チェック
+        let resisted = false;
+        if (attacker.equipBonuses && attacker.equipBonuses.statusResist > 0) {
+          if (Math.random() * 100 < attacker.equipBonuses.statusResist) resisted = true;
+        }
+        if (!resisted && attacker.passive && attacker.passive.statusResist) {
+          if (Math.random() * 100 < attacker.passive.statusResist) resisted = true;
+        }
+        if (resisted) {
+          addLog(`<span style="color:#88ddff">${attacker.name} は反撃Dazeを無効化!</span>`);
+        } else {
+          const existing = attacker.statuses.find(s => s.type === 'daze');
+          if (existing) {
+            existing.turns = Math.max(existing.turns, tb.counterDazeTurns);
+          } else {
+            attacker.statuses.push({
+              type: 'daze',
+              turns: tb.counterDazeTurns,
+            });
+          }
+          addLog(`<span style="color:#c4a8e8">${target.name} の装備が発動! ${attacker.name} がDaze!(${tb.counterDazeTurns}T)</span>`);
         }
       }
     }
@@ -5023,7 +5091,7 @@ function pickMoveOption(unit, target, options, aiType, attackSkills) {
 }
 
 function executeSkillEnemy(attacker, target, skill) {
-  attacker.st -= skill.cost;
+  attacker.st -= getEffectiveSkillCost(attacker, skill);
   attacker.hasAttacked = true;
 
   // ★FIX: 敵の範囲攻撃(Whirlwind等)も8マス全展開
