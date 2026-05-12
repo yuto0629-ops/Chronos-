@@ -2716,7 +2716,8 @@ function applyDamage(attacker, target, skill) {
       const pd = state.partyData.find(p => p.charName === attacker.charName || p.classKey === attacker.classKey);
       if (pd) {
         pd.exp = (pd.exp || 0) + amount;
-        addLog(`<span style="color:#ffd060">💰 ${attacker.name} 幸運発動! EXP+${amount}</span>`);
+        showExpPopup(attacker, amount); // ★演出ポップアップ
+        addLog(`<span style="color:#ffd060; font-weight:bold;">💰 ${attacker.name} 幸運発動! EXP+${amount}</span>`);
       }
     }
   }
@@ -3031,6 +3032,31 @@ function showHealPopup(unit, amount) {
   popup.style.top = '40%';
   cell.appendChild(popup);
   setTimeout(() => popup.remove(), 1400);
+}
+
+// ★Phase 5.3a: EXP獲得ポップアップ(幸運のコイン等)
+function showExpPopup(unit, amount) {
+  const grid = document.getElementById('battle-grid');
+  if (!grid) return;
+  const cell = grid.children[unit.y * BATTLE_W + unit.x];
+  if (!cell) return;
+  const popup = document.createElement('div');
+  popup.className = 'damage-popup';
+  popup.textContent = `💰+${amount} EXP!`;
+  // インラインstyleで黄金色+太字+少し大きく+ふわっと上に
+  popup.style.cssText = `
+    left: 50%; top: 10%;
+    color: #ffd060;
+    font-size: 14px;
+    font-weight: 900;
+    text-shadow: 0 0 4px #ffaa00, 0 0 8px #ff8800, 1px 1px 2px #000;
+    animation: dmg-pop 1.8s ease-out forwards;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 100;
+  `;
+  cell.appendChild(popup);
+  setTimeout(() => popup.remove(), 1800);
 }
 
 // ====== 演出: ヒット時の揺れ ======
