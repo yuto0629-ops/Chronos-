@@ -235,7 +235,8 @@ function applyEquipment(unit, equippedKeys) {
     reflectMeleeFixed: 0,  // ★Phase 5.3b: 近接被弾時の固定反射ダメ
     aoeAtkBuff: 0,         // ★Phase 5.3b: 隣接味方への攻撃力バフ
     lifestealRatio: 0,     // ★Phase 5.3b: 与ダメ→HP吸収率(%)
-    battleStartAoeDmg: 0,  // ★Phase 5.3c: 戦闘開始時の敵全体ダメ(鷹)
+    falconDmg: 0,          // ★Phase 5.3c(修正): 鷹のターン毎攻撃ダメ
+    falconTurns: 0,        // ★Phase 5.3c(修正): 鷹の継続ターン数
     reviveOnce: false,     // ★Phase 5.3c: 1度だけ復活フラグ
     reviveHpRatio: 0,      // ★Phase 5.3c: 復活時HP回復%
     chainAttackDmg: 0,     // ★Phase 5.3c: 攻撃後の追撃ダメ(連打の腕輪)
@@ -243,6 +244,8 @@ function applyEquipment(unit, equippedKeys) {
   };
   // ★Phase 5.3c: 復活フラグの使用済みリセット(装備変更時)
   unit.reviveUsed = false;
+  // ★Phase 5.3c(修正): 鷹の残ターン管理(itemKey単位で別カウント)
+  if (!unit.falconCounters) unit.falconCounters = {};
 
   equippedKeys.forEach(key => {
     const item = ITEMS[key];
@@ -296,8 +299,17 @@ function applyEquipment(unit, equippedKeys) {
     if (s.reflect_melee_fixed) unit.equipBonuses.reflectMeleeFixed += s.reflect_melee_fixed;
     if (s.aoe_atk_buff) unit.equipBonuses.aoeAtkBuff += s.aoe_atk_buff;
     if (s.lifesteal_ratio) unit.equipBonuses.lifestealRatio += s.lifesteal_ratio;
-    // ★Phase 5.3c: 鷹 / 不死鳥 / 連打
-    if (s.battle_start_aoe_dmg) unit.equipBonuses.battleStartAoeDmg += s.battle_start_aoe_dmg;
+    // ★Phase 5.3c(修正): 鷹 - itemKey毎に残ターンも初期化
+    if (s.falcon_dmg && s.falcon_turns) {
+      // 装備中アイテムごとの個別管理。装備変更時にカウンタ初期化
+      unit.falconCounters[key] = {
+        dmg: s.falcon_dmg,
+        remaining: s.falcon_turns,
+      };
+      // 集計用(表示や検出用)
+      unit.equipBonuses.falconDmg = Math.max(unit.equipBonuses.falconDmg, s.falcon_dmg);
+      unit.equipBonuses.falconTurns = Math.max(unit.equipBonuses.falconTurns, s.falcon_turns);
+    }
     if (s.revive_once) unit.equipBonuses.reviveOnce = true;
     if (s.revive_hp_ratio) unit.equipBonuses.reviveHpRatio = Math.max(unit.equipBonuses.reviveHpRatio, s.revive_hp_ratio);
     if (s.chain_attack_dmg) unit.equipBonuses.chainAttackDmg += s.chain_attack_dmg;
@@ -538,36 +550,64 @@ function initBattle(missionId) {
 
   battle.log = [`<span class="log-turn">[Turn 1]</span> ${mission ? mission.name_ja : ''} 開始!`];
 
-  // ★Phase 5.3c: 戦闘開始時の鷹砲撃(Wooden/Stone Falcon)
-  const falconHolders = battle.units.filter(u =>
-    u.side === 'ally' && !u.dead && u.equipBonuses && u.equipBonuses.battleStartAoeDmg > 0
-  );
-  falconHolders.forEach(holder => {
-    const dmg = holder.equipBonuses.battleStartAoeDmg;
-    const enemies = battle.units.filter(e => !e.dead && e.side !== holder.side);
-    if (enemies.length === 0) return;
-    addLog(`<span style="color:#d4a020; font-weight:bold;">🦅 ${holder.name} の鷹が舞い降りる!</span>`);
-    enemies.forEach(e => {
-      // 魔法防御で軽減
-      const defense = e.armor ? e.armor[2] : 0;
-      const finalDmg = Math.max(1, dmg - defense);
-      const wasAlive = e.hp > 0;
-      e.hp = Math.max(0, e.hp - finalDmg);
-      // ★遅延ポップアップで全敵に順次表示(視覚的に分かりやすく)
-      setTimeout(() => {
-        if (typeof showDamagePopup === 'function') {
-          showDamagePopup(e, finalDmg, false, 'magic');
-        }
-      }, 200);
-      addLog(`<span style="color:#c060c0">→ ${e.name} に魔法${finalDmg}ダメ</span>`);
-      if (wasAlive && e.hp === 0) {
-        e.killedBy = holder.id;
-        addLog(`<span style="color:#ff6060">${e.name} が倒れた!</span>`);
-      }
-    });
-  });
-
   startUnitTurn();
+}
+
+// ★Phase 5.3c: 鷹のスウィッシュ演出(影が上から下に走る)
+function spawnFalconSwoop(target, color, accent, dmgAmount) {
+  const grid = document.getElementById('battle-grid');
+  if (!grid) return;
+  const cell = grid.children[target.y * BATTLE_W + target.x];
+  if (!cell) return;
+
+  // 影シルエットの楕円を生成(細長く翼っぽく)
+  const shadow = document.createElement('div');
+  shadow.style.cssText = `
+    position: absolute;
+    left: 50%;
+    top: -120%;
+    width: 70%;
+    height: 30%;
+    transform: translateX(-50%) rotate(-20deg);
+    background: radial-gradient(ellipse, ${accent} 20%, ${color} 60%, transparent 100%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.92;
+    box-shadow: 0 0 12px ${color};
+    animation: falcon-swoop 0.45s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  `;
+  cell.appendChild(shadow);
+
+  // 着弾フラッシュ + ダメ表示
+  setTimeout(() => {
+    shadow.remove();
+    // セルを少し光らせる
+    const unitEl = cell.querySelector('.unit');
+    if (unitEl) {
+      unitEl.classList.add('flash-stun');
+      setTimeout(() => unitEl.classList.remove('flash-stun'), 400);
+    }
+    // ダメ表示
+    if (typeof showDamagePopup === 'function') {
+      showDamagePopup(target, dmgAmount, false, 'magic');
+    }
+  }, 420);
+}
+
+// CSS アニメ定義を head に注入(初回のみ)
+if (typeof document !== 'undefined' && !document.getElementById('falcon-swoop-style')) {
+  const style = document.createElement('style');
+  style.id = 'falcon-swoop-style';
+  style.textContent = `
+    @keyframes falcon-swoop {
+      0%   { top: -120%; opacity: 0; transform: translateX(-50%) rotate(-30deg) scaleX(0.4); }
+      30%  { opacity: 1; }
+      70%  { top: 40%; opacity: 1; transform: translateX(-50%) rotate(-15deg) scaleX(1); }
+      100% { top: 70%; opacity: 0; transform: translateX(-50%) rotate(0deg) scaleX(1.4); }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 // 地形チェックヘルパー
@@ -652,6 +692,40 @@ function startUnitTurn() {
         if (wasAlive && e.hp === 0 && u.side === 'ally' && !u.isPet) {
           e.killedBy = u.id;
         }
+      });
+    }
+    // ★Phase 5.3c(修正): 鷹がターン毎に攻撃(木の鷹=7T/20、石の鷹=2T/40)
+    if (u.falconCounters && Object.keys(u.falconCounters).length > 0) {
+      Object.keys(u.falconCounters).forEach(itemKey => {
+        const counter = u.falconCounters[itemKey];
+        if (counter.remaining <= 0) return;
+        // 生存敵がいなければスキップ
+        const enemies = battle.units.filter(e => !e.dead && e.side !== u.side && e.hp > 0);
+        if (enemies.length === 0) {
+          counter.remaining = 0;
+          return;
+        }
+        // ランダム敵1体選択
+        const target = enemies[Math.floor(Math.random() * enemies.length)];
+        const dmg = counter.dmg;
+        // 遠距離防御で軽減 (armor[1])
+        const defense = target.armor ? target.armor[1] : 0;
+        const finalDmg = Math.max(1, dmg - defense);
+        const wasAlive = target.hp > 0;
+        target.hp = Math.max(0, target.hp - finalDmg);
+        // 色: 石の鷹は黒+金、木の鷹は茶色
+        const isStone = (itemKey === 'stone_falcon');
+        const birdColor = isStone ? '#1a1a1a' : '#6b3a1c';
+        const birdAccent = isStone ? '#d4a020' : '#a06030';
+        const falconName = isStone ? '石の鷹' : '木の鷹';
+        // 演出
+        spawnFalconSwoop(target, birdColor, birdAccent, finalDmg);
+        addLog(`<span style="color:${birdAccent}; font-weight:bold;">🦅 ${u.name} の${falconName}が${target.name}に遠距離${finalDmg}ダメ! (残${counter.remaining - 1}T)</span>`);
+        if (wasAlive && target.hp === 0) {
+          target.killedBy = u.id;
+          addLog(`<span style="color:#ff6060">${target.name} が鷹に倒された!</span>`);
+        }
+        counter.remaining -= 1;
       });
     }
   }
@@ -930,7 +1004,7 @@ function renderCharStats(pd) {
   let reflectMeleeFixed = 0;                               // ★Phase 5.3b
   let aoeAtkBuff = 0;                                      // ★Phase 5.3b
   let lifestealRatio = 0;                                  // ★Phase 5.3b
-  let battleStartAoeDmg = 0;                               // ★Phase 5.3c
+  let falconDmg = 0, falconTurns = 0;                      // ★Phase 5.3c(修正)
   let reviveOnce = false, reviveHpRatio = 0;               // ★Phase 5.3c
   let chainAttackDmg = 0;                                  // ★Phase 5.3c
 
@@ -972,7 +1046,10 @@ function renderCharStats(pd) {
     if (s.reflect_melee_fixed) reflectMeleeFixed += s.reflect_melee_fixed;  // ★Phase 5.3b
     if (s.aoe_atk_buff) aoeAtkBuff += s.aoe_atk_buff;                       // ★Phase 5.3b
     if (s.lifesteal_ratio) lifestealRatio += s.lifesteal_ratio;             // ★Phase 5.3b
-    if (s.battle_start_aoe_dmg) battleStartAoeDmg += s.battle_start_aoe_dmg; // ★Phase 5.3c
+    if (s.falcon_dmg && s.falcon_turns) {                                   // ★Phase 5.3c(修正)
+      falconDmg = Math.max(falconDmg, s.falcon_dmg);
+      falconTurns = Math.max(falconTurns, s.falcon_turns);
+    }
     if (s.revive_once) reviveOnce = true;                                   // ★Phase 5.3c
     if (s.revive_hp_ratio) reviveHpRatio = Math.max(reviveHpRatio, s.revive_hp_ratio); // ★Phase 5.3c
     if (s.chain_attack_dmg) chainAttackDmg += s.chain_attack_dmg;           // ★Phase 5.3c
@@ -1073,7 +1150,7 @@ function renderCharStats(pd) {
   if (reflectMeleeFixed > 0) bonusParts.push(`近接被弾時${reflectMeleeFixed}反射`); // ★Phase 5.3b
   if (aoeAtkBuff > 0) bonusParts.push(`隣接味方の攻撃+${aoeAtkBuff}`);             // ★Phase 5.3b
   if (lifestealRatio > 0) bonusParts.push(`与ダメ${lifestealRatio}%吸収`);         // ★Phase 5.3b
-  if (battleStartAoeDmg > 0) bonusParts.push(`🦅戦闘開始時 敵全体に${battleStartAoeDmg}`); // ★Phase 5.3c
+  if (falconDmg > 0) bonusParts.push(`🦅ターン毎 敵1体に${falconDmg}遠距離(${falconTurns}T)`); // ★Phase 5.3c(修正)
   if (reviveOnce) bonusParts.push(`🪶1度復活(HP${reviveHpRatio}%)`);                 // ★Phase 5.3c
   if (chainAttackDmg > 0) bonusParts.push(`👊攻撃後追撃${chainAttackDmg}`);          // ★Phase 5.3c
 
@@ -1867,7 +1944,16 @@ function showUnitStatusPopup(u) {
     if (eb.reflectMeleeFixed > 0) parts.push(`近接被弾${eb.reflectMeleeFixed}反射`); // ★Phase 5.3b
     if (eb.aoeAtkBuff > 0) parts.push(`隣接味方攻撃+${eb.aoeAtkBuff}`);              // ★Phase 5.3b
     if (eb.lifestealRatio > 0) parts.push(`与ダメ${eb.lifestealRatio}%吸収`);        // ★Phase 5.3b
-    if (eb.battleStartAoeDmg > 0) parts.push(`🦅戦闘開始時${eb.battleStartAoeDmg}`);  // ★Phase 5.3c
+    // ★Phase 5.3c(修正): 鷹の残ターンを表示
+    if (u.falconCounters) {
+      Object.keys(u.falconCounters).forEach(key => {
+        const c = u.falconCounters[key];
+        if (c.remaining > 0) {
+          const name = key === 'stone_falcon' ? '石の鷹' : '木の鷹';
+          parts.push(`🦅${name}(残${c.remaining}T/${c.dmg}ダメ)`);
+        }
+      });
+    }
     if (eb.reviveOnce) parts.push(u.reviveUsed ? '🪶復活済' : `🪶1度復活`);            // ★Phase 5.3c
     if (eb.chainAttackDmg > 0) parts.push(`👊攻撃後追撃${eb.chainAttackDmg}`);        // ★Phase 5.3c
     if (parts.length > 0) {
