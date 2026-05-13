@@ -1261,7 +1261,7 @@ function renderCharDetail() {
     const colorClass = `color-${item.color}`;
     // ★Phase 5.4: 画像アイコン使用、フォールバックは色別絵文字
     const fallback = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
-    const iconHtml = renderItemIcon(itemKey, 36, fallback);
+    const iconHtml = renderItemIcon(itemKey, 48, fallback);
     return `
       <div class="char-item-slot" onclick="showItemSlotPopup(${i})">
         <div class="char-item-label">Item ${i + 1}:</div>
