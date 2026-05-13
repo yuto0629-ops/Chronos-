@@ -1259,11 +1259,13 @@ function renderCharDetail() {
     }
     const item = ITEMS[itemKey];
     const colorClass = `color-${item.color}`;
-    const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+    // ★Phase 5.4: 画像アイコン使用、フォールバックは色別絵文字
+    const fallback = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+    const iconHtml = renderItemIcon(itemKey, 36, fallback);
     return `
       <div class="char-item-slot" onclick="showItemSlotPopup(${i})">
         <div class="char-item-label">Item ${i + 1}:</div>
-        <div class="char-item-icon ${colorClass}">${icon}</div>
+        <div class="char-item-icon ${colorClass}">${iconHtml}</div>
         <div style="font-size:8px; color:#d4a020; text-align:center; margin-top:2px;">${item.name_ja}</div>
       </div>
     `;
@@ -1757,7 +1759,8 @@ function showItemSlotPopup(slotIdx) {
 
   const colorBg = { orange: '#5a3a1a', blue: '#1a3a5a', pink: '#5a1a4a' }[item.color];
   const colorBorder = { orange: '#d4a020', blue: '#60a0d4', pink: '#d460a0' }[item.color];
-  const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+  const fallback = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+  const iconHtml = renderItemIcon(itemKey, 40, fallback);
 
   const overlay = document.createElement('div');
   overlay.className = 'item-slot-popup';
@@ -1773,8 +1776,8 @@ function showItemSlotPopup(slotIdx) {
                 box-shadow:0 0 30px ${colorBorder}66;">
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;
                   padding-bottom:10px; border-bottom:1px solid #444;">
-        <div style="width:48px; height:48px; background:${colorBg}; border:1px solid ${colorBorder};
-                    border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:24px;">${icon}</div>
+        <div style="width:56px; height:56px; background:${colorBg}; border:1px solid ${colorBorder};
+                    border-radius:4px; display:flex; align-items:center; justify-content:center;">${iconHtml}</div>
         <div style="flex:1;">
           <div style="font-size:14px; font-weight:800; color:#fff;">${item.name_ja}</div>
           <div style="font-size:9px; color:#d4a020; margin-top:2px;">★ Value: ${item.value}</div>
@@ -1856,12 +1859,13 @@ function openInvPicker(slotIdx) {
   availableItems.forEach(({ key, invIdx }) => {
     const item = ITEMS[key];
     const colorClass = `color-${item.color}`;
-    const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+    const fallback = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+    const iconHtml = renderItemIcon(key, 32, fallback);
 
     const el = document.createElement('div');
     el.className = 'inventory-item';
     el.innerHTML = `
-      <div class="item-icon-small ${colorClass}">${icon}</div>
+      <div class="item-icon-small ${colorClass}">${iconHtml}</div>
       <div class="item-info">
         <div class="item-name">${item.name_ja}</div>
         <div class="item-effect">${item.effect}</div>
@@ -3327,6 +3331,18 @@ function showExpPopup(unit, amount) {
   setTimeout(() => popup.remove(), 1800);
 }
 
+// ★Phase 5.4: アイテムアイコンを <img> として返すヘルパー
+// itemKey: ITEMSのキー名
+// size: 表示サイズ(px、デフォルト32)
+// fallback: アイコンパスが取得できなかった時の絵文字(デフォルト🎁)
+function renderItemIcon(itemKey, size = 32, fallback = '🎁') {
+  const path = (typeof getItemIconPath === 'function') ? getItemIconPath(itemKey) : null;
+  if (!path) {
+    return `<span style="font-size:${size}px;line-height:1;">${fallback}</span>`;
+  }
+  return `<img src="${path}" alt="${itemKey}" style="width:${size}px;height:${size}px;image-rendering:pixelated;vertical-align:middle;" onerror="this.outerHTML='<span style=&quot;font-size:${size}px;line-height:1;&quot;>${fallback}</span>'">`;
+}
+
 // ====== 演出: ヒット時の揺れ ======
 function playHitEffect(unit, isCrit) {
   const grid = document.getElementById('battle-grid');
@@ -4768,8 +4784,9 @@ function renderRewardCard(reward) {
     const itemsHTML = reward.items.map(key => {
       const item = ITEMS[key];
       const colorClass = `color-${item.color}`;
-      const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
-      return `<div class="reward-item-display ${colorClass}" title="${item.name_ja}">${icon}</div>`;
+      const fallback = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+      const iconHtml = renderItemIcon(key, 28, fallback);
+      return `<div class="reward-item-display ${colorClass}" title="${item.name_ja}">${iconHtml}</div>`;
     }).join('');
     return `
       <div class="reward-icon">📦</div>
@@ -4848,7 +4865,8 @@ function showItemPickModal(itemKeys) {
   itemKeys.forEach(key => {
     const item = ITEMS[key];
     const colorClass = `color-${item.color}`;
-    const icon = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+    const fallback = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+    const iconHtml = renderItemIcon(key, 48, fallback);
     const colorJa = { orange: '食料系', blue: '装備系', pink: '魔法系' }[item.color];
 
     // ★Phase 2 Step 3: epicランクならピンク枠
@@ -4861,7 +4879,7 @@ function showItemPickModal(itemKeys) {
     card.className = 'reward-card';
     if (isEpic) card.style.cssText = epicStyle;
     card.innerHTML = `
-      <div class="reward-item-display ${colorClass}" style="width: 56px; height: 56px; font-size: 28px;">${icon}</div>
+      <div class="reward-item-display ${colorClass}" style="width: 64px; height: 64px; display:flex; align-items:center; justify-content:center;">${iconHtml}</div>
       <div class="reward-card-title" style="font-size: 12px; margin-top: 4px; ${isEpic ? 'color: #ff66bb;' : ''}">${item.name_ja}</div>
       <div style="font-size: 9px; color: #a8956e;">${colorJa}</div>
       <div class="reward-card-detail" style="font-size: 10px; color: #d4c5a9; margin-top: 6px;">${item.effect}</div>

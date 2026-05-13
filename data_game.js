@@ -835,3 +835,43 @@ function rollRewardRank(difficulty, isBlueGate) {
   return 'epic';
 }
 
+
+// ============================================================
+// ★Phase 5.4: アイテム → アイコンパス分類
+// アイテムキー → "icons/icon_xxx.png" を返す
+// ============================================================
+function getItemIconPath(itemKey) {
+  const item = ITEMS[itemKey];
+  if (!item) return null;
+  const color = item.color;
+  const k = itemKey;
+
+  // ===== ORANGE系 =====
+  if (color === 'orange') {
+    if (k === 'drumstick' || k === 'steak' || k === 'chicken') return 'icons/icon_orange_meat.png';
+    if (k === 'apple' || k === 'pear' || k === 'pomegranate' || k === 'lucky_coin') return 'icons/icon_orange_fruit.png';
+    // パン・パイ・スコーン・食事系
+    if (k.includes('bread') || k.includes('meal') || k.includes('scone') || k.includes('pie')) return 'icons/icon_orange_food.png';
+    // それ以外(ワイン/角笛/癒し/不死鳥/エール)
+    return 'icons/icon_orange_special.png';
+  }
+
+  // ===== BLUE系 =====
+  if (color === 'blue') {
+    if (k.includes('helm') || k.includes('cap') || k.includes('skullcap')) return 'icons/icon_blue_head.png';
+    if (k.includes('tunic') || k.includes('vest') || k.includes('cloak')) return 'icons/icon_blue_body.png';
+    if (k.includes('glove') || k.includes('boot') || k.includes('sandal') || k.includes('belt')) return 'icons/icon_blue_accessory.png';
+    return 'icons/icon_blue_body.png'; // フォールバック
+  }
+
+  // ===== PINK系 =====
+  if (color === 'pink') {
+    if (k.includes('parchment') || k.includes('book')) return 'icons/icon_pink_book.png';
+    if (k.includes('stone')) return 'icons/icon_pink_stone.png';
+    if (k.includes('emblem')) return 'icons/icon_pink_emblem.png';
+    // それ以外(油/瓶/指輪/呪い人形/戦旗/鷹/連打/吸血の牙)
+    return 'icons/icon_pink_arcane.png';
+  }
+
+  return null;
+}

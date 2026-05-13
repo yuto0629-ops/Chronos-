@@ -1703,7 +1703,11 @@ function showDebugItemPicker(filterColor = 'all', filterValue = 'all') {
     const it = ITEMS[key];
     const colorBg = { orange: '#5a3a1a', blue: '#1a3a5a', pink: '#5a1a4a' }[it.color];
     const colorBorder = { orange: '#d4a020', blue: '#60a0d4', pink: '#d460a0' }[it.color];
-    const icon = it.color === 'orange' ? '🍞' : (it.color === 'blue' ? '🛡' : '✨');
+    const fallback = it.color === 'orange' ? '🍞' : (it.color === 'blue' ? '🛡' : '✨');
+    // ★Phase 5.4: 画像アイコン使用
+    const iconHtml = (typeof renderItemIcon === 'function') 
+      ? renderItemIcon(key, 24, fallback)
+      : `<span style="font-size:16px;">${fallback}</span>`;
     return `
       <div class="debug-item-card" data-key="${key}" style="
         background:${colorBg}; border:1px solid ${colorBorder};
@@ -1712,7 +1716,7 @@ function showDebugItemPicker(filterColor = 'all', filterValue = 'all') {
         min-width:140px; max-width:160px;
       ">
         <div style="display:flex; align-items:center; justify-content:space-between;">
-          <span style="font-size:16px;">${icon}</span>
+          ${iconHtml}
           <span style="font-size:9px; color:#d4a020; font-weight:700;">★V${it.value}</span>
         </div>
         <div style="font-size:11px; font-weight:700; color:#fff;">${it.name_ja}</div>
