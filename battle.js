@@ -235,8 +235,14 @@ function applyEquipment(unit, equippedKeys) {
     reflectMeleeFixed: 0,  // ★Phase 5.3b: 近接被弾時の固定反射ダメ
     aoeAtkBuff: 0,         // ★Phase 5.3b: 隣接味方への攻撃力バフ
     lifestealRatio: 0,     // ★Phase 5.3b: 与ダメ→HP吸収率(%)
+    battleStartAoeDmg: 0,  // ★Phase 5.3c: 戦闘開始時の敵全体ダメ(鷹)
+    reviveOnce: false,     // ★Phase 5.3c: 1度だけ復活フラグ
+    reviveHpRatio: 0,      // ★Phase 5.3c: 復活時HP回復%
+    chainAttackDmg: 0,     // ★Phase 5.3c: 攻撃後の追撃ダメ(連打の腕輪)
     armor: [0, 0, 0],
   };
+  // ★Phase 5.3c: 復活フラグの使用済みリセット(装備変更時)
+  unit.reviveUsed = false;
 
   equippedKeys.forEach(key => {
     const item = ITEMS[key];
@@ -290,6 +296,11 @@ function applyEquipment(unit, equippedKeys) {
     if (s.reflect_melee_fixed) unit.equipBonuses.reflectMeleeFixed += s.reflect_melee_fixed;
     if (s.aoe_atk_buff) unit.equipBonuses.aoeAtkBuff += s.aoe_atk_buff;
     if (s.lifesteal_ratio) unit.equipBonuses.lifestealRatio += s.lifesteal_ratio;
+    // ★Phase 5.3c: 鷹 / 不死鳥 / 連打
+    if (s.battle_start_aoe_dmg) unit.equipBonuses.battleStartAoeDmg += s.battle_start_aoe_dmg;
+    if (s.revive_once) unit.equipBonuses.reviveOnce = true;
+    if (s.revive_hp_ratio) unit.equipBonuses.reviveHpRatio = Math.max(unit.equipBonuses.reviveHpRatio, s.revive_hp_ratio);
+    if (s.chain_attack_dmg) unit.equipBonuses.chainAttackDmg += s.chain_attack_dmg;
   });
 }
 
@@ -526,6 +537,36 @@ function initBattle(missionId) {
   }
 
   battle.log = [`<span class="log-turn">[Turn 1]</span> ${mission ? mission.name_ja : ''} 開始!`];
+
+  // ★Phase 5.3c: 戦闘開始時の鷹砲撃(Wooden/Stone Falcon)
+  const falconHolders = battle.units.filter(u =>
+    u.side === 'ally' && !u.dead && u.equipBonuses && u.equipBonuses.battleStartAoeDmg > 0
+  );
+  falconHolders.forEach(holder => {
+    const dmg = holder.equipBonuses.battleStartAoeDmg;
+    const enemies = battle.units.filter(e => !e.dead && e.side !== holder.side);
+    if (enemies.length === 0) return;
+    addLog(`<span style="color:#d4a020; font-weight:bold;">🦅 ${holder.name} の鷹が舞い降りる!</span>`);
+    enemies.forEach(e => {
+      // 魔法防御で軽減
+      const defense = e.armor ? e.armor[2] : 0;
+      const finalDmg = Math.max(1, dmg - defense);
+      const wasAlive = e.hp > 0;
+      e.hp = Math.max(0, e.hp - finalDmg);
+      // ★遅延ポップアップで全敵に順次表示(視覚的に分かりやすく)
+      setTimeout(() => {
+        if (typeof showDamagePopup === 'function') {
+          showDamagePopup(e, finalDmg, false, 'magic');
+        }
+      }, 200);
+      addLog(`<span style="color:#c060c0">→ ${e.name} に魔法${finalDmg}ダメ</span>`);
+      if (wasAlive && e.hp === 0) {
+        e.killedBy = holder.id;
+        addLog(`<span style="color:#ff6060">${e.name} が倒れた!</span>`);
+      }
+    });
+  });
+
   startUnitTurn();
 }
 
@@ -889,6 +930,9 @@ function renderCharStats(pd) {
   let reflectMeleeFixed = 0;                               // ★Phase 5.3b
   let aoeAtkBuff = 0;                                      // ★Phase 5.3b
   let lifestealRatio = 0;                                  // ★Phase 5.3b
+  let battleStartAoeDmg = 0;                               // ★Phase 5.3c
+  let reviveOnce = false, reviveHpRatio = 0;               // ★Phase 5.3c
+  let chainAttackDmg = 0;                                  // ★Phase 5.3c
 
   (pd.equipped || []).forEach(key => {
     const item = ITEMS[key];
@@ -928,6 +972,10 @@ function renderCharStats(pd) {
     if (s.reflect_melee_fixed) reflectMeleeFixed += s.reflect_melee_fixed;  // ★Phase 5.3b
     if (s.aoe_atk_buff) aoeAtkBuff += s.aoe_atk_buff;                       // ★Phase 5.3b
     if (s.lifesteal_ratio) lifestealRatio += s.lifesteal_ratio;             // ★Phase 5.3b
+    if (s.battle_start_aoe_dmg) battleStartAoeDmg += s.battle_start_aoe_dmg; // ★Phase 5.3c
+    if (s.revive_once) reviveOnce = true;                                   // ★Phase 5.3c
+    if (s.revive_hp_ratio) reviveHpRatio = Math.max(reviveHpRatio, s.revive_hp_ratio); // ★Phase 5.3c
+    if (s.chain_attack_dmg) chainAttackDmg += s.chain_attack_dmg;           // ★Phase 5.3c
   });
 
   // パッシブのarmorBonus
@@ -1025,6 +1073,9 @@ function renderCharStats(pd) {
   if (reflectMeleeFixed > 0) bonusParts.push(`近接被弾時${reflectMeleeFixed}反射`); // ★Phase 5.3b
   if (aoeAtkBuff > 0) bonusParts.push(`隣接味方の攻撃+${aoeAtkBuff}`);             // ★Phase 5.3b
   if (lifestealRatio > 0) bonusParts.push(`与ダメ${lifestealRatio}%吸収`);         // ★Phase 5.3b
+  if (battleStartAoeDmg > 0) bonusParts.push(`🦅戦闘開始時 敵全体に${battleStartAoeDmg}`); // ★Phase 5.3c
+  if (reviveOnce) bonusParts.push(`🪶1度復活(HP${reviveHpRatio}%)`);                 // ★Phase 5.3c
+  if (chainAttackDmg > 0) bonusParts.push(`👊攻撃後追撃${chainAttackDmg}`);          // ★Phase 5.3c
 
   const bonusHTML = bonusParts.length > 0
     ? `<div class="char-stats-bonus">⚡ ${bonusParts.join(' / ')}</div>`
@@ -1816,6 +1867,9 @@ function showUnitStatusPopup(u) {
     if (eb.reflectMeleeFixed > 0) parts.push(`近接被弾${eb.reflectMeleeFixed}反射`); // ★Phase 5.3b
     if (eb.aoeAtkBuff > 0) parts.push(`隣接味方攻撃+${eb.aoeAtkBuff}`);              // ★Phase 5.3b
     if (eb.lifestealRatio > 0) parts.push(`与ダメ${eb.lifestealRatio}%吸収`);        // ★Phase 5.3b
+    if (eb.battleStartAoeDmg > 0) parts.push(`🦅戦闘開始時${eb.battleStartAoeDmg}`);  // ★Phase 5.3c
+    if (eb.reviveOnce) parts.push(u.reviveUsed ? '🪶復活済' : `🪶1度復活`);            // ★Phase 5.3c
+    if (eb.chainAttackDmg > 0) parts.push(`👊攻撃後追撃${eb.chainAttackDmg}`);        // ★Phase 5.3c
     if (parts.length > 0) {
       equipInfo = `<div class="usp-equip">⚡ ${parts.join(' / ')}</div>`;
     }
@@ -1829,6 +1883,21 @@ function showUnitStatusPopup(u) {
       const totalAmt = activeBuffs.reduce((sum, b) => sum + (b.amount || 0), 0);
       const minTurns = Math.min(...activeBuffs.map(b => b.turns || 0));
       activeBuffsHtml = `<div class="usp-equip" style="color:#ffaa44;">⚔ 攻撃+${totalAmt} (残${minTurns}T)</div>`;
+    }
+  }
+
+  // ★Phase 5.3b: 隣接 Battle Banner からのバフ表示(戦闘中の動的判定)
+  let bannerBuffHtml = '';
+  if (!u.dead && typeof battle !== 'undefined' && battle.units) {
+    const adjacentBannerHolders = battle.units.filter(o =>
+      !o.dead && o.side === u.side && o.id !== u.id &&
+      o.equipBonuses && o.equipBonuses.aoeAtkBuff > 0 &&
+      Math.abs(o.x - u.x) <= 1 && Math.abs(o.y - u.y) <= 1
+    );
+    if (adjacentBannerHolders.length > 0) {
+      const totalBanner = adjacentBannerHolders.reduce((sum, b) => sum + b.equipBonuses.aoeAtkBuff, 0);
+      const sources = adjacentBannerHolders.map(b => b.name).join(', ');
+      bannerBuffHtml = `<div class="usp-equip" style="color:#ff8080;">🚩 ${sources}の戦旗で攻撃+${totalBanner}</div>`;
     }
   }
 
@@ -1908,6 +1977,7 @@ function showUnitStatusPopup(u) {
       </div>
       ${equipInfo}
       ${activeBuffsHtml}
+      ${bannerBuffHtml}
       ${passiveHTML}
       ${statusHTML}
       ${skillsList ? `<div class="usp-skills-section">${skillsList}</div>` : ''}
@@ -2804,6 +2874,36 @@ function applyDamage(attacker, target, skill) {
     }
   }
 
+  // ★Phase 5.3c: Band of Pummelling - 攻撃後にランダム敵に追加近接ダメ
+  // 無限ループ防止のため、追撃自体は再帰しない(skill._isChainフラグでガード)
+  if (totalDamage > 0 && attacker.hp > 0 && attacker.equipBonuses && attacker.equipBonuses.chainAttackDmg > 0 && !skill._isChain) {
+    const dmg = attacker.equipBonuses.chainAttackDmg;
+    // ランダム敵を選ぶ(現在のtarget以外、生きてるやつ)
+    const candidates = battle.units.filter(e =>
+      !e.dead && e.side !== attacker.side && e.hp > 0 && e.id !== target.id
+    );
+    // candidatesが空ならtarget自身を含めて生存敵を再選択
+    const finalCandidates = candidates.length > 0 ? candidates :
+      battle.units.filter(e => !e.dead && e.side !== attacker.side && e.hp > 0);
+    if (finalCandidates.length > 0) {
+      const pick = finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
+      const defense = pick.armor ? pick.armor[0] : 0; // 近接
+      const finalDmg = Math.max(1, dmg - defense);
+      const wasAlive = pick.hp > 0;
+      pick.hp = Math.max(0, pick.hp - finalDmg);
+      setTimeout(() => {
+        if (typeof showDamagePopup === 'function') {
+          showDamagePopup(pick, finalDmg, false, 'chain');
+        }
+      }, 250);
+      addLog(`<span style="color:#ff8866; font-weight:bold;">👊 ${attacker.name} 連打! ${pick.name} に追加${finalDmg}ダメ</span>`);
+      if (wasAlive && pick.hp === 0) {
+        pick.killedBy = attacker.id;
+        addLog(`<span style="color:#ff6060">${pick.name} は連打で倒れた!</span>`);
+      }
+    }
+  }
+
   // ====== 視覚演出 ======
   // 攻撃モーション(攻撃者が前進)
   playAttackLunge(attacker);
@@ -3371,6 +3471,31 @@ function killUnit(unit) {
       }
     }
   }
+
+  // ★Phase 5.3c: Phoenix Feather 復活判定(死亡確定の直前)
+  if (unit.equipBonuses && unit.equipBonuses.reviveOnce && !unit.reviveUsed && !unit.isPet) {
+    unit.reviveUsed = true;
+    const reviveHp = Math.max(1, Math.floor(unit.maxHP * (unit.equipBonuses.reviveHpRatio || 30) / 100));
+    unit.hp = reviveHp;
+    // 状態異常も一掃(復活)
+    unit.statuses = [];
+    if (grid) {
+      const cell = grid.children[unit.y * BATTLE_W + unit.x];
+      if (cell) {
+        const unitEl = cell.querySelector('.unit');
+        if (unitEl) {
+          unitEl.classList.remove('dying');
+          unitEl.classList.add('flash-stun'); // 黄色フラッシュ流用
+          setTimeout(() => unitEl.classList.remove('flash-stun'), 1000);
+        }
+      }
+    }
+    addLog(`<span style="color:#ff8060; font-weight:bold; font-size:14px;">🪶 ${unit.name} 不死鳥の羽が発動! HP${reviveHp}で復活!</span>`);
+    showHealPopup(unit, reviveHp);
+    renderBattle();
+    return; // 死亡処理を中断
+  }
+
   unit.dead = true;
   addLog(`<span style="color:#aaa">${unit.name} が倒れた</span>`);
 
