@@ -3820,6 +3820,10 @@ function onMissionVictory() {
 
   if (isAreaCleared && !state.cleared.includes(missionId)) {
     state.cleared.push(missionId);
+    // ★Phase 5.5: ステージクリアでcost+1付与
+    if (typeof state.cost !== 'number') state.cost = 0;
+    state.cost += 1;
+    addLog(`<span style="color:#9966ff; font-weight:bold;">💎 cost +1! (所持: ${state.cost})</span>`);
   }
   // available からの除去・unlocks解放はエリアクリア時のみ
   if (isAreaCleared) {
@@ -6041,3 +6045,152 @@ function showBossPostBattleDialog(mission, onContinue) {
   });
 }
 
+
+// ============================================================
+// ★Phase 5.5: ショップモーダル
+// shopKey: SHOPSのキー (例: 'outpost')
+// missionId: 隣接ミッションのID (購入済み管理用)
+// ============================================================
+function openShop(shopKey, missionId) {
+  const shop = SHOPS[shopKey];
+  if (!shop) {
+    console.error('Unknown shop:', shopKey);
+    return;
+  }
+  if (!state.purchasedShops) state.purchasedShops = [];
+  const shopUniqueId = `${missionId || 'global'}__${shopKey}`;
+  const isClosed = state.purchasedShops.includes(shopUniqueId);
+
+  // 既存モーダル削除
+  const existing = document.getElementById('shop-modal-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'shop-modal-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    z-index: 9999; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  `;
+
+  const cost = (typeof state.cost === 'number') ? state.cost : 0;
+  const slotsAvailable = state.inventory ? (state.inventory.length < 99) : true;
+
+  // アイテム行HTML生成
+  const itemsHtml = shop.items.map((shopItem, idx) => {
+    const item = ITEMS[shopItem.key];
+    if (!item) return '';
+    const fallback = item.color === 'orange' ? '🍞' : (item.color === 'blue' ? '🛡' : '✨');
+    const iconHtml = renderItemIcon(shopItem.key, 40, fallback);
+    const canAfford = cost >= shopItem.cost;
+    const buttonText = !canAfford ? 'cost不足' : (isClosed ? '閉店中' : '購入');
+    const buttonStyle = (!canAfford || isClosed)
+      ? 'background:#444; color:#888; cursor:not-allowed;'
+      : 'background:#3a8a3a; color:#fff; cursor:pointer;';
+    return `
+      <div style="
+        display: flex; align-items: center; gap: 10px;
+        background: rgba(50,30,20,0.6); border: 1px solid #6a5a3a;
+        border-radius: 6px; padding: 10px;
+        ${isClosed || !canAfford ? 'opacity: 0.55;' : ''}
+      ">
+        <div style="
+          width:52px; height:52px; flex-shrink: 0;
+          background: rgba(0,0,0,0.35); border: 1px solid #6a5a3a;
+          border-radius: 4px; display:flex; align-items:center; justify-content:center;
+        ">${iconHtml}</div>
+        <div style="flex-grow: 1; min-width: 0;">
+          <div style="font-size:13px; font-weight:700; color:#fff;">${item.name_ja}</div>
+          <div style="font-size:10px; color:#d4c5a9; margin-top:2px;">${item.effect}</div>
+        </div>
+        <div style="display:flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          <div style="font-size:13px; color:#d4b8ff; font-weight:700; white-space: nowrap;">💎 ${shopItem.cost}</div>
+          <button class="shop-buy-btn" data-idx="${idx}" style="
+            font-size:11px; padding: 4px 10px;
+            border: 1px solid #6a8a4a; border-radius: 4px;
+            ${buttonStyle}
+            font-family: inherit; font-weight: 700;
+          " ${(!canAfford || isClosed) ? 'disabled' : ''}>${buttonText}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const closedBanner = isClosed
+    ? `<div style="background: rgba(120,40,40,0.7); border:1px solid #ff6666; padding:6px 12px; border-radius:4px; margin: 0 0 12px 0; text-align:center; color:#ffcccc; font-size:12px;">⚠ このショップは既に利用済みです</div>`
+    : '';
+
+  overlay.innerHTML = `
+    <div style="
+      background: linear-gradient(180deg, #2a1f12 0%, #1a1410 100%);
+      border: 2px solid #d4a020; border-radius: 8px;
+      padding: 16px 18px; max-width: 420px; width: 100%;
+      max-height: 88vh; overflow-y: auto;
+      box-shadow: 0 0 30px rgba(212,160,32,0.4);
+    ">
+      <div style="text-align: center; margin-bottom: 10px;">
+        <div style="font-size: 16px; color: #d4a020; font-weight: 700; letter-spacing: 1px;">
+          🏪 ${shop.name_en}
+        </div>
+        <div style="font-size: 12px; color: #a8956e; margin-top: 2px;">${shop.name_ja}</div>
+      </div>
+      <div style="
+        display: flex; justify-content: center; align-items: center; gap: 8px;
+        background: rgba(80,40,120,0.4); border: 1px solid #9966ff;
+        border-radius: 4px; padding: 6px 12px; margin-bottom: 12px;
+        font-size: 13px;
+      ">
+        <span style="color:#d4b8ff;">所持:</span>
+        <span style="color:#fff; font-weight:700;">💎 ${cost}</span>
+      </div>
+      ${closedBanner}
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${itemsHtml}
+      </div>
+      <button id="shop-close-btn" style="
+        margin-top: 14px; width: 100%;
+        background: rgba(60,40,30,0.7); border: 1px solid #6a5a3a;
+        color: #d4c5a9; padding: 8px; border-radius: 4px;
+        font-family: inherit; font-size: 13px; cursor: pointer;
+      ">閉じる</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // 閉じるボタン
+  document.getElementById('shop-close-btn').onclick = () => overlay.remove();
+
+  // 購入ボタン
+  overlay.querySelectorAll('.shop-buy-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const shopItem = shop.items[idx];
+      if (!shopItem) return;
+      const c = (typeof state.cost === 'number') ? state.cost : 0;
+      if (c < shopItem.cost) return;
+      if (state.purchasedShops.includes(shopUniqueId)) return;
+
+      // 購入実行
+      state.cost = c - shopItem.cost;
+      if (!state.inventory) state.inventory = [];
+      state.inventory.push(shopItem.key);
+      state.purchasedShops.push(shopUniqueId);
+
+      const item = ITEMS[shopItem.key];
+      // モーダル閉じて再オープン(閉店表示に切り替え)
+      overlay.remove();
+      // トースト表示
+      if (typeof addLogEquipToast === 'function') {
+        addLogEquipToast(`🛒 ${item.name_ja} を購入! (-💎${shopItem.cost})`);
+      }
+      // HUD更新
+      if (typeof updateCostHUD === 'function') updateCostHUD();
+      // ショップ再表示(閉店状態で)
+      openShop(shopKey, missionId);
+    };
+  });
+}
+
+// ★Phase 5.5: テスト用 - DEBUG/コンソールから手動で呼べる
+window.openShop = openShop;

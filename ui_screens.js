@@ -12,6 +12,8 @@ const state = {
   clearedSubMissions: [],       // ★段階1: クリア済みサブミッションID
   currentSubMissionId: null,    // ★段階1: 現在の戦闘で挑戦中のサブミッションID
   currentAreaBackup: null,      // ★段階1: サブミッション戦闘時のエリアデータバックアップ
+  cost: 0,                      // ★Phase 5.5: ショップ通貨
+  purchasedShops: [],           // ★Phase 5.5: 購入済みショップキー("trivial_plain__outpost" 等)
 };
 
 function goTo(screen) {
@@ -82,6 +84,37 @@ function updateKeyCounters() {
     blueWrap.classList.toggle('has-key', blue > 0);
     blueWrap.classList.toggle('empty', blue === 0);
   }
+
+  // ★Phase 5.5: cost HUD表示(鍵HUDの隣に動的注入)
+  updateCostHUD();
+}
+
+// ★Phase 5.5: cost HUD更新(鍵HUDの右に追加)
+function updateCostHUD() {
+  let costHud = document.getElementById('map-cost-hud');
+  if (!costHud) {
+    // 初回: 鍵HUDのコンテナに追加
+    const blueWrap = document.getElementById('map-key-blue');
+    if (!blueWrap || !blueWrap.parentElement) return;
+    costHud = document.createElement('div');
+    costHud.id = 'map-cost-hud';
+    costHud.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 12px;
+      padding: 4px 8px;
+      background: rgba(80, 40, 120, 0.6);
+      border: 1px solid #9966ff;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #d4b8ff;
+      font-weight: 700;
+    `;
+    blueWrap.parentElement.appendChild(costHud);
+  }
+  const cost = (typeof state.cost === 'number') ? state.cost : 0;
+  costHud.innerHTML = `<span style="font-size:14px;">💎</span><span>${cost}</span>`;
 }
 
 // ★Phase3 v9: 透明ノードCSSを注入(初回のみ)
@@ -369,6 +402,12 @@ function showDebugMenu() {
         <button id="debug-item-picker" style="flex:1; min-width:120px; padding:10px; background:#4a2a4a; border:1px solid #c060c0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           🎁 アイテム獲得
         </button>
+        <button id="debug-shop-picker" style="flex:1; min-width:120px; padding:10px; background:#2a3a4a; border:1px solid #6080c0; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          🏪 ショップテスト
+        </button>
+        <button id="debug-cost-plus" style="flex:1; min-width:120px; padding:10px; background:#3a2a4a; border:1px solid #9966ff; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          💎 cost+10
+        </button>
         <button id="debug-reset" style="flex:1; min-width:120px; padding:10px; background:#4a2a2a; border:1px solid #c06060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           ステート リセット
         </button>
@@ -489,6 +528,20 @@ function showDebugMenu() {
     showDebugItemPicker();
   };
 
+  // ★Phase 5.5: ショップテスト
+  document.getElementById('debug-shop-picker').onclick = () => {
+    overlay.remove();
+    showDebugShopPicker();
+  };
+
+  // ★Phase 5.5: cost +10
+  document.getElementById('debug-cost-plus').onclick = () => {
+    if (typeof state.cost !== 'number') state.cost = 0;
+    state.cost += 10;
+    addLogEquipToast && addLogEquipToast(`💎 cost +10 (所持: ${state.cost})`);
+    if (typeof updateCostHUD === 'function') updateCostHUD();
+  };
+
   // リセット
   document.getElementById('debug-reset').onclick = () => {
     if (!confirm('ステートを完全リセットします。本当によろしいですか?')) return;
@@ -498,6 +551,8 @@ function showDebugMenu() {
     state.clearedSubMissions = [];
     state.chestsOpened = [];
     state.routeFlags = {};
+    state.cost = 0;                // ★Phase 5.5
+    state.purchasedShops = [];     // ★Phase 5.5
     addLogEquipToast && addLogEquipToast('🛠 ステートリセット完了');
     if (typeof renderMap === 'function') renderMap();
     overlay.remove();
@@ -1829,6 +1884,81 @@ function showDebugItemPicker(filterColor = 'all', filterValue = 'all') {
       }, 400);
       if (typeof addLogEquipToast === 'function') {
         addLogEquipToast(`🎁 ${it.name_ja} を入手!`);
+      }
+    };
+  });
+}
+
+// ★Phase 5.5: DEBUG用 - ショップピッカー(5店舗から選んでテスト)
+function showDebugShopPicker() {
+  document.querySelectorAll('.debug-shop-picker-overlay').forEach(o => o.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'debug-shop-picker-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    z-index: 9999; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  `;
+
+  // 各ショップのボタンHTML
+  const shopBtnsHtml = Object.entries(SHOPS).map(([key, shop]) => {
+    const items = shop.items.map(it => ITEMS[it.key]?.name_ja || it.key).join(' / ');
+    const totalCost = shop.items.reduce((sum, it) => sum + it.cost, 0);
+    return `
+      <button class="debug-shop-btn" data-shop="${key}" style="
+        display: block; width: 100%; padding: 12px;
+        background: rgba(50,30,60,0.7); border: 1px solid #9966ff;
+        color: #fff; border-radius: 4px; cursor: pointer;
+        text-align: left; margin-bottom: 8px;
+        font-family: inherit;
+      ">
+        <div style="font-size:13px; font-weight:700; color:#d4b8ff;">🏪 ${shop.name_en}</div>
+        <div style="font-size:11px; color:#a8956e; margin-top:2px;">${shop.name_ja} (${shop.near}隣)</div>
+        <div style="font-size:10px; color:#d4c5a9; margin-top:4px;">${items}</div>
+        <div style="font-size:10px; color:#9966ff; margin-top:2px;">合計 💎${totalCost}</div>
+      </button>
+    `;
+  }).join('');
+
+  const cost = (typeof state.cost === 'number') ? state.cost : 0;
+
+  overlay.innerHTML = `
+    <div style="
+      background: linear-gradient(180deg, #2a1f12 0%, #1a1410 100%);
+      border: 2px solid #9966ff; border-radius: 8px;
+      padding: 16px 18px; max-width: 420px; width: 100%;
+      max-height: 88vh; overflow-y: auto;
+      box-shadow: 0 0 30px rgba(153,102,255,0.4);
+    ">
+      <div style="text-align: center; margin-bottom: 12px;">
+        <div style="font-size: 16px; color: #d4b8ff; font-weight: 700;">
+          🏪 DEBUG: ショップテスト
+        </div>
+        <div style="font-size: 11px; color: #a8956e; margin-top: 2px;">
+          所持: 💎 ${cost}
+        </div>
+      </div>
+      <div>${shopBtnsHtml}</div>
+      <button id="debug-shop-picker-close" style="
+        margin-top: 8px; width: 100%;
+        background: rgba(60,40,30,0.7); border: 1px solid #6a5a3a;
+        color: #d4c5a9; padding: 8px; border-radius: 4px;
+        font-family: inherit; font-size: 13px; cursor: pointer;
+      ">閉じる</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('debug-shop-picker-close').onclick = () => overlay.remove();
+
+  overlay.querySelectorAll('.debug-shop-btn').forEach(btn => {
+    btn.onclick = () => {
+      const shopKey = btn.dataset.shop;
+      overlay.remove();
+      if (typeof openShop === 'function') {
+        openShop(shopKey, 'debug');
       }
     };
   });

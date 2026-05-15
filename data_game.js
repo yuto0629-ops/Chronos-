@@ -875,3 +875,61 @@ function getItemIconPath(itemKey) {
 
   return null;
 }
+
+// ============================================================
+// ★Phase 5.5: ショップ定義
+// マップ上の特定スポットにアイコン配置、タップで入店
+// 1スポットにつき1ショップ、1回購入で閉鎖
+// ============================================================
+const SHOPS = {
+  outpost: {
+    name_ja: '辺境の宿駅',
+    name_en: 'The Outpost',
+    near: 'The Trivial Plain',
+    items: [
+      { key: 'stale_bread', cost: 1 },
+      { key: 'scone', cost: 3 },
+      { key: 'wine_cup', cost: 3 },
+    ]
+  },
+  village: {
+    name_ja: '村の雑貨屋',
+    name_en: 'The Village Shop',
+    near: 'The Village',
+    items: [
+      { key: 'skullcap', cost: 2 },
+      { key: 'leather_tunic', cost: 3 },
+      { key: 'leather_gloves', cost: 3 },
+    ]
+  },
+  armory: {
+    name_ja: '武具屋',
+    name_en: 'The Armory',
+    near: 'The Tournament',
+    items: [
+      { key: 'leather_tunic', cost: 2 },
+      { key: 'helm', cost: 5 },
+      { key: 'sturdy_belt', cost: 3 },
+    ]
+  },
+  academy: {
+    name_ja: '魔法学院店',
+    name_en: 'The Academy Shop',
+    near: 'The Academy',
+    items: [
+      { key: 'parchment_skill', cost: 1 },
+      { key: 'ring_greater_abrasion', cost: 6 },
+      { key: 'oil_fury', cost: 3 },
+    ]
+  },
+  lemuel: {
+    name_ja: 'レミュエルの雑貨',
+    name_en: "Lemuel's Knick Knacks",
+    near: 'Sandy Shore',
+    items: [
+      { key: 'emblem_fists', cost: 2 },
+      { key: 'band_pummelling', cost: 9 },
+      { key: 'stone_strength', cost: 3 },
+    ]
+  },
+};
