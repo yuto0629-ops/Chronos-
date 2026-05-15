@@ -1116,10 +1116,22 @@ function onNotImplementedNodeClick(mission) {
 
 // ★Phase3: ショップクリック (今は未実装トースト)
 function onShopNodeClick(shop) {
-  if (typeof addLogEquipToast === 'function') {
-    addLogEquipToast(`🏪 ${shop.name} (購買所は未実装)`);
-  } else {
-    alert(`${shop.name} は未実装です`);
+  // ★Phase 5.5: shopKey が紐付いてればショップモーダルを開く
+  if (!shop.shopKey) {
+    if (typeof addLogEquipToast === 'function') {
+      addLogEquipToast(`🏪 ${shop.name} (未割り当て)`);
+    }
+    return;
+  }
+  const shopData = (typeof SHOPS !== 'undefined') ? SHOPS[shop.shopKey] : null;
+  if (!shopData) {
+    if (typeof addLogEquipToast === 'function') {
+      addLogEquipToast(`🏪 ${shop.shopKey} のデータが見つかりません`);
+    }
+    return;
+  }
+  if (typeof openShop === 'function') {
+    openShop(shop.shopKey, shop.id);
   }
 }
 

@@ -665,10 +665,10 @@ const MAP_DECORATIONS = {
     { id: 'gate_blue_2', name: 'Blue Gate II', type: 'blue', x: 39.7, y: 63.1 },
   ],
   shops: [
-    { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.5 },
-    { id: 'shop_2', name: 'Shop 2', x: 47.0, y: 30.6 },
-    { id: 'shop_3', name: 'Shop 3', x: 50.0, y: 41.0 },
-    { id: 'shop_4', name: 'Shop 4', x: 18.9, y: 91.9 },
+    { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.5, shopKey: 'village' },
+    { id: 'shop_2', name: 'Shop 2', x: 47.0, y: 30.6, shopKey: 'armory' },
+    { id: 'shop_3', name: 'Shop 3', x: 50.0, y: 41.0, shopKey: 'academy' },
+    { id: 'shop_4', name: 'Shop 4', x: 18.9, y: 91.9, shopKey: 'lemuel' },
   ],
 };
 
