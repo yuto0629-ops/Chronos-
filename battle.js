@@ -3829,6 +3829,13 @@ function onMissionVictory() {
   if (isAreaCleared) {
     state.available = state.available.filter(id => id !== missionId);
     mission.unlocks.forEach(unlockId => {
+      // ★Phase 5.6: ゲートでブロックされてるルートは解放しない
+      const blockingGate = (typeof getBlockingGate === 'function')
+        ? getBlockingGate(missionId, unlockId) : null;
+      if (blockingGate) {
+        addLog(`<span style="color:#ffaa66;">🔒 ${MISSIONS[unlockId]?.name_ja || unlockId} の手前に ${blockingGate.name} があります</span>`);
+        return; // ゲートで止まる
+      }
       if (!state.available.includes(unlockId) && !state.cleared.includes(unlockId)) {
         state.available.push(unlockId);
       }

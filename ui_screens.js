@@ -14,6 +14,7 @@ const state = {
   currentAreaBackup: null,      // ★段階1: サブミッション戦闘時のエリアデータバックアップ
   cost: 0,                      // ★Phase 5.5: ショップ通貨
   purchasedShops: [],           // ★Phase 5.5: 購入済みショップキー("trivial_plain__outpost" 等)
+  openedGates: [],              // ★Phase 5.6: 開放済みゲートID
 };
 
 function goTo(screen) {
@@ -408,6 +409,9 @@ function showDebugMenu() {
         <button id="debug-cost-plus" style="flex:1; min-width:120px; padding:10px; background:#3a2a4a; border:1px solid #9966ff; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           💎 cost+10
         </button>
+        <button id="debug-keys-plus" style="flex:1; min-width:120px; padding:10px; background:#3a3a2a; border:1px solid #d4a020; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
+          🔑 鍵+1(両色)
+        </button>
         <button id="debug-reset" style="flex:1; min-width:120px; padding:10px; background:#4a2a2a; border:1px solid #c06060; color:#fff; cursor:pointer; border-radius:4px; font-size:12px; font-weight:700;">
           ステート リセット
         </button>
@@ -542,6 +546,15 @@ function showDebugMenu() {
     if (typeof updateCostHUD === 'function') updateCostHUD();
   };
 
+  // ★Phase 5.6: 鍵 +1(両色)
+  document.getElementById('debug-keys-plus').onclick = () => {
+    if (!state.keys) state.keys = { gold: 0, blue: 0 };
+    state.keys.gold = (state.keys.gold || 0) + 1;
+    state.keys.blue = (state.keys.blue || 0) + 1;
+    addLogEquipToast && addLogEquipToast(`🗝🔑 両色の鍵+1 (gold:${state.keys.gold}, blue:${state.keys.blue})`);
+    if (typeof updateKeyCounters === 'function') updateKeyCounters();
+  };
+
   // リセット
   document.getElementById('debug-reset').onclick = () => {
     if (!confirm('ステートを完全リセットします。本当によろしいですか?')) return;
@@ -553,6 +566,7 @@ function showDebugMenu() {
     state.routeFlags = {};
     state.cost = 0;                // ★Phase 5.5
     state.purchasedShops = [];     // ★Phase 5.5
+    state.openedGates = [];        // ★Phase 5.6
     addLogEquipToast && addLogEquipToast('🛠 ステートリセット完了');
     if (typeof renderMap === 'function') renderMap();
     overlay.remove();
@@ -1071,16 +1085,27 @@ function renderMapDecorations() {
   (MAP_DECORATIONS.gates || []).forEach(g => {
     const node = document.createElement('div');
     node.className = `map-deco map-deco-gate map-deco-gate-${g.type}`;
-    node.style.cssText = tapAreaStyle + `left:${g.x}%;top:${g.y}%;`;
-    node.title = `${g.name} (${g.type.toUpperCase()} KEY)`;
-    // 中身は空(画像のゲートが見えるように)
+    // ★Phase 5.6: 開放済みなら半透明
+    const isOpened = state.openedGates && state.openedGates.includes(g.id);
+    let extraStyle = '';
+    if (isOpened) extraStyle = 'opacity:0.3;';
+    node.style.cssText = tapAreaStyle + `left:${g.x}%;top:${g.y}%;` + extraStyle;
+    node.title = `${g.name} (${g.type.toUpperCase()} KEY)${isOpened ? ' 開放済み' : ''}`;
     node.innerHTML = '';
     node.onclick = (e) => {
       const vp = document.getElementById('map-viewport');
       if (vp && vp._suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
       e.preventDefault(); e.stopPropagation();
-      const msg = `🔒 ${g.name} (${g.type.toUpperCase()} KEY 必要、未実装)`;
-      if (typeof addLogEquipToast === 'function') addLogEquipToast(msg);
+      // ★Phase 5.6: 開放済みなら通行可能メッセージ、未開放なら鍵で開ける
+      if (isOpened) {
+        if (typeof addLogEquipToast === 'function') {
+          addLogEquipToast(`✅ ${g.name} は開放済みです`);
+        }
+        return;
+      }
+      if (typeof tryOpenGate === 'function') {
+        tryOpenGate(g);
+      }
     };
     container.appendChild(node);
   });
@@ -1995,4 +2020,62 @@ function showDebugShopPicker() {
       }
     };
   });
+}
+
+// ============================================================
+// ★Phase 5.6: ゲートシステム
+// ゲートが特定のルート(from→to)をブロック、鍵で開放
+// ============================================================
+
+// 特定のルートをブロックしてる未開放ゲートを返す(あれば)
+function getBlockingGate(fromId, toId) {
+  if (typeof MAP_DECORATIONS === 'undefined' || !MAP_DECORATIONS.gates) return null;
+  if (!state.openedGates) state.openedGates = [];
+  for (const g of MAP_DECORATIONS.gates) {
+    if (!g.blocks) continue;
+    if (g.blocks.from === fromId && g.blocks.to === toId) {
+      if (!state.openedGates.includes(g.id)) {
+        return g;
+      }
+    }
+  }
+  return null;
+}
+
+// ゲート開放(鍵を消費)
+function tryOpenGate(gate) {
+  if (!state.keys) state.keys = { gold: 0, blue: 0 };
+  const keyType = gate.type;  // 'gold' or 'blue'
+  const have = state.keys[keyType] || 0;
+  if (have <= 0) {
+    if (typeof addLogEquipToast === 'function') {
+      const keyLabel = keyType === 'gold' ? '🗝 ゴールド鍵' : '🔑 ブルー鍵';
+      addLogEquipToast(`🔒 ${gate.name}: ${keyLabel}が必要です`);
+    }
+    return false;
+  }
+  // 確認ダイアログ
+  const keyLabel = keyType === 'gold' ? 'ゴールド鍵' : 'ブルー鍵';
+  if (!confirm(`${gate.name} を ${keyLabel}1個を使って開放しますか?\n(所持: ${have}個)`)) {
+    return false;
+  }
+  state.keys[keyType] = have - 1;
+  if (!state.openedGates) state.openedGates = [];
+  state.openedGates.push(gate.id);
+  // ★Phase 5.6: ゲート開放でブロックされてたルートを解放
+  if (gate.blocks) {
+    const fromId = gate.blocks.from;
+    const toId = gate.blocks.to;
+    if (state.cleared && state.cleared.includes(fromId)) {
+      if (!state.available.includes(toId) && !state.cleared.includes(toId)) {
+        state.available.push(toId);
+      }
+    }
+  }
+  if (typeof addLogEquipToast === 'function') {
+    addLogEquipToast(`🔓 ${gate.name} を開放! (${keyLabel} -1)`);
+  }
+  if (typeof updateKeyCounters === 'function') updateKeyCounters();
+  if (typeof renderMap === 'function') renderMap();
+  return true;
 }

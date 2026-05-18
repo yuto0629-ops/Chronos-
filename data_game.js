@@ -660,9 +660,9 @@ const MISSIONS = {
 // ★Phase3 v9: マップ装飾 (3ゲート + 4ショップ) - イベントはMISSIONSに統合済み
 const MAP_DECORATIONS = {
   gates: [
-    { id: 'gate_gold_1', name: 'Gold Gate',  type: 'gold', x: 41.9, y: 23.0 },
-    { id: 'gate_blue_1', name: 'Blue Gate I',  type: 'blue', x: 26.7, y: 32.4 },
-    { id: 'gate_blue_2', name: 'Blue Gate II', type: 'blue', x: 39.7, y: 63.1 },
+    { id: 'gate_gold_1', name: 'Gold Gate',  type: 'gold', x: 41.9, y: 23.0, blocks: { from: 'tournament', to: 'dueling_grounds' } },
+    { id: 'gate_blue_1', name: 'Blue Gate I',  type: 'blue', x: 26.7, y: 32.4, blocks: { from: 'tournament', to: 'the_crag' } },
+    { id: 'gate_blue_2', name: 'Blue Gate II', type: 'blue', x: 39.7, y: 63.1, blocks: { from: 'academy', to: 'glade' } },
   ],
   shops: [
     { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.5, shopKey: 'village' },
