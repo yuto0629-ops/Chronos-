@@ -320,7 +320,7 @@ const MISSIONS = {
       { classKey: 'coyote', x: 18, y: 4, level: 2 },
       { classKey: 'badger', x: 17, y: 6, level: 1 },
     ],
-    unlocks: ['village', 'event_lone_challenger', 'event_potion_master'],
+    unlocks: ['village','event_lone_challenger'],
     warriorReward: false,
     chest: { type: 'blue_key' },  // ★1個目のBLUE KEY (B1かB2どちらか開錠用)
     missions: [
@@ -414,7 +414,7 @@ const MISSIONS = {
       { classKey: 'badger', x: 18, y: 5, level: 3 },
       { classKey: 'coyote', x: 17, y: 7, level: 3 },
     ],
-    unlocks: ['tournament'],  // ★S4→S6 武闘大会
+    unlocks: ['tournament','glade'],  // ★S4→S6 武闘大会
     warriorReward: false,
     chest: { type: 'item_rare' },
   },
@@ -423,13 +423,13 @@ const MISSIONS = {
     id: 'tournament',
     name: 'The Tournament',
     name_ja: '武闘大会',
-    x: 38.2, y: 41.0,  // ★S6: 中ボス
+    x: 38.2, y: 41,  // ★S6: 中ボス
     enemies: [
       { classKey: 'champion', x: 17, y: 3, level: 3, rank: 'elite' },
       { classKey: 'knight', x: 18, y: 5, level: 3, rank: 'elite' },
       { classKey: 'barbarian', x: 17, y: 7, level: 3, rank: 'boss' },
     ],
-    unlocks: ['dueling_grounds'],  // ★S6→S10 真ラスボス
+    unlocks: ['dueling_grounds','sandy_shore','the_crag'],  // ★S6→S10 真ラスボス
     warriorReward: false,
     chest: { type: 'gold_key' },  // ★中ボス撃破でGOLD KEY (G1門開錠用)
     isBossBattle: true,  // 中ボス
@@ -439,7 +439,7 @@ const MISSIONS = {
     id: 'dueling_grounds',
     name: 'The Dueling Grounds',
     name_ja: '決闘場',
-    x: 35.0, y: 19.2,  // ★S10: 真のラスボス、ACT1 GOAL
+    x: 35, y: 19.2,  // ★S10: 真のラスボス、ACT1 GOAL
     enemies: [
       { classKey: 'bandit_boss', x: 17, y: 5, level: 5, rank: 'boss' },
     ],
@@ -487,7 +487,7 @@ const MISSIONS = {
       { classKey: 'badger', x: 18, y: 5, level: 2 },
       { classKey: 'coyote', x: 17, y: 7, level: 2 },
     ],
-    unlocks: ['training_grounds', 'event_bandit_chief'],
+    unlocks: ['training_grounds','event_bandit_chief','event_potion_master'],
     warriorReward: false,
     requiresKey: 'blue',
     missions: [
@@ -576,7 +576,7 @@ const MISSIONS = {
     id: 'sandy_shore',
     name: 'Sandy Shore',
     name_ja: '砂浜',
-    x: 56.8, y: 21.0,  // ★S7
+    x: 56.8, y: 21,  // ★S7
     enemies: [],
     unlocks: [],
     warriorReward: false,
@@ -590,7 +590,7 @@ const MISSIONS = {
     id: 'event_lone_challenger',
     name: 'Lone Challenger',
     name_ja: '孤高の挑戦者',
-    x: 72.3, y: 69.0,
+    x: 72.3, y: 69,
     isEvent: true,
     eventNarration: '道に蛮族が胡坐を組んで座っている。目を合わせると、ニヤッと笑った。',
     eventOpeningLine: { speaker: 'Tor', text: '手合わせ願おう、旅人よ!' },
@@ -666,8 +666,8 @@ const MAP_DECORATIONS = {
   ],
   shops: [
     { id: 'shop_1', name: 'Shop 1', x: 16.4, y: 40.5, shopKey: 'village' },
-    { id: 'shop_2', name: 'Shop 2', x: 47.0, y: 30.6, shopKey: 'armory' },
-    { id: 'shop_3', name: 'Shop 3', x: 50.0, y: 41.0, shopKey: 'academy' },
+    { id: 'shop_2', name: 'Shop 2', x: 47, y: 30.6, shopKey: 'armory' },
+    { id: 'shop_3', name: 'Shop 3', x: 50, y: 41, shopKey: 'academy' },
     { id: 'shop_4', name: 'Shop 4', x: 18.9, y: 91.9, shopKey: 'lemuel' },
   ],
 };
@@ -886,6 +886,7 @@ const SHOPS = {
     name_ja: '辺境の宿駅',
     name_en: 'The Outpost',
     near: 'The Trivial Plain',
+    requiredClear: 'trivial_plain',
     items: [
       { key: 'stale_bread', cost: 1 },
       { key: 'scone', cost: 3 },
@@ -896,6 +897,7 @@ const SHOPS = {
     name_ja: '村の雑貨屋',
     name_en: 'The Village Shop',
     near: 'The Village',
+    requiredClear: 'village',
     items: [
       { key: 'skullcap', cost: 2 },
       { key: 'leather_tunic', cost: 3 },
@@ -906,6 +908,7 @@ const SHOPS = {
     name_ja: '武具屋',
     name_en: 'The Armory',
     near: 'The Tournament',
+    requiredClear: 'tournament',
     items: [
       { key: 'leather_tunic', cost: 2 },
       { key: 'helm', cost: 5 },
@@ -916,6 +919,7 @@ const SHOPS = {
     name_ja: '魔法学院店',
     name_en: 'The Academy Shop',
     near: 'The Academy',
+    requiredClear: 'academy',
     items: [
       { key: 'parchment_skill', cost: 1 },
       { key: 'ring_greater_abrasion', cost: 6 },
@@ -926,6 +930,7 @@ const SHOPS = {
     name_ja: 'レミュエルの雑貨',
     name_en: "Lemuel's Knick Knacks",
     near: 'Sandy Shore',
+    requiredClear: 'sandy_shore',
     items: [
       { key: 'emblem_fists', cost: 2 },
       { key: 'band_pummelling', cost: 9 },

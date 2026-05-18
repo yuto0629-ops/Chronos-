@@ -1089,7 +1089,16 @@ function renderMapDecorations() {
   (MAP_DECORATIONS.shops || []).forEach(s => {
     const node = document.createElement('div');
     node.className = 'map-deco map-deco-shop';
-    node.style.cssText = tapAreaStyle + `left:${s.x}%;top:${s.y}%;`;
+    // ★Phase 5.5: 開店判定 - 未開店ならグレー表示
+    const shopData = (typeof SHOPS !== 'undefined' && s.shopKey) ? SHOPS[s.shopKey] : null;
+    const requiredClear = shopData && shopData.requiredClear;
+    const isOpen = !requiredClear || (state.cleared && state.cleared.includes(requiredClear));
+    let extraStyle = '';
+    if (!isOpen) {
+      extraStyle = 'filter:grayscale(1) brightness(0.5); opacity:0.6;';
+      node.classList.add('shop-locked');
+    }
+    node.style.cssText = tapAreaStyle + `left:${s.x}%;top:${s.y}%;` + extraStyle;
     node.title = s.name;
     node.innerHTML = '';
     node.onclick = (e) => {
@@ -1129,6 +1138,18 @@ function onShopNodeClick(shop) {
       addLogEquipToast(`🏪 ${shop.shopKey} のデータが見つかりません`);
     }
     return;
+  }
+  // ★Phase 5.5: 開店条件チェック - 隣接エリアクリア後でないと開かない
+  if (shopData.requiredClear) {
+    const isCleared = state.cleared && state.cleared.includes(shopData.requiredClear);
+    if (!isCleared) {
+      const reqMission = (typeof MISSIONS !== 'undefined') ? MISSIONS[shopData.requiredClear] : null;
+      const reqName = reqMission ? reqMission.name_ja : shopData.requiredClear;
+      if (typeof addLogEquipToast === 'function') {
+        addLogEquipToast(`🔒 ${shopData.name_ja} は『${reqName}』をクリアすると開店します`);
+      }
+      return;
+    }
   }
   if (typeof openShop === 'function') {
     openShop(shop.shopKey, shop.id);
